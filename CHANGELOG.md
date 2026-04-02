@@ -1,0 +1,51 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [0.1.0] - 2026-04-02
+
+### Documentation
+
+- Add inline documentation and doctests for public API
+- Add using-cortx-cli skill spec, plan, and CLAUDE.md
+- Add open-source readiness design spec
+- Update spec with git-cliff for automated changelog generation
+- Add open-source readiness implementation plan
+- Add contributing guidelines
+- Add README with install, usage, and query reference
+
+### Features
+
+- Project setup with dependencies and error types
+- Add Value type with date parsing, comparison, and array contains
+- Add schema types and TypeRegistry with types.yaml config
+- Add frontmatter validation against schema definitions
+- Add frontmatter parsing and serialization
+- Add Entity struct
+- Add Repository trait and MarkdownRepository adapter
+- Add file-level locking for safe concurrent writes
+- Add query AST types
+- Add query language parser
+- Add query evaluator for filtering entities
+- Add CLI with generic CRUD, query, meta, note editing, and doctor commands
+- Add CLI integration tests
+- Add init command to bootstrap vault structure
+- Add performance benchmarks with criterion
+- Extend benchmarks to 10k and 20k files, update baseline
+
+### Miscellaneous
+
+- Fix clippy warnings and verify full test suite
+- Expand .gitignore with IDE, OS, and lock file patterns
+- Add package metadata for open-source release
+- Add dual MIT/Apache-2.0 license files
+- Add CI workflow for fmt, clippy, and tests
+- Add release workflow with cross-platform builds and git-cliff changelog
+- Add code coverage gate at 95% using cargo-llvm-cov
+- Boost coverage to 98% with targeted tests and exclusions
+
+### Style
+
+- Run cargo fmt on all source files
+- Run cargo fmt on test files
+

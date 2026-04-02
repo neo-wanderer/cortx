@@ -228,10 +228,7 @@ fn test_validate_array_field_rejects_non_array() {
     fm.insert("tags".into(), Value::String("not-an-array".into()));
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("must be an array"));
+    assert!(result.unwrap_err().to_string().contains("must be an array"));
 }
 
 #[test]
@@ -258,10 +255,12 @@ fn test_validate_bool_field_rejects_non_bool() {
     fm.insert("active".into(), Value::String("yes".into()));
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("must be a boolean"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("must be a boolean")
+    );
 }
 
 #[test]
@@ -275,10 +274,7 @@ fn test_validate_number_field_rejects_non_number() {
     fm.insert("priority".into(), Value::String("high".into()));
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("must be a number"));
+    assert!(result.unwrap_err().to_string().contains("must be a number"));
 }
 
 #[test]
@@ -394,10 +390,7 @@ types:
 "#;
     let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
     let task_def = registry.get("task").unwrap();
-    assert_eq!(
-        task_def.fields["priority"].field_type,
-        FieldType::Number
-    );
+    assert_eq!(task_def.fields["priority"].field_type, FieldType::Number);
 }
 
 #[test]

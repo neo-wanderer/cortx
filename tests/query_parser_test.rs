@@ -192,7 +192,10 @@ fn test_parse_ident_as_string_value() {
 #[test]
 fn test_parse_text_search_non_string_pattern() {
     let err = parse_query("text ~ true").unwrap_err();
-    assert!(err.to_string().contains("text search pattern must be a string"));
+    assert!(
+        err.to_string()
+            .contains("text search pattern must be a string")
+    );
 }
 
 // -- Token Display --

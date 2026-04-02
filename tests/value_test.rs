@@ -33,10 +33,7 @@ fn test_value_display_date() {
 
 #[test]
 fn test_value_display_array() {
-    let arr = Value::Array(vec![
-        Value::String("a".into()),
-        Value::String("b".into()),
-    ]);
+    let arr = Value::Array(vec![Value::String("a".into()), Value::String("b".into())]);
     assert_eq!(format!("{arr}"), "[a, b]");
 }
 

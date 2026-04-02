@@ -430,12 +430,7 @@ fn test_query_json_format() {
         .assert()
         .success();
     cortx_cmd(&vault)
-        .args([
-            "query",
-            r#"type = "task""#,
-            "--format",
-            "json",
-        ])
+        .args(["query", r#"type = "task""#, "--format", "json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("task-json"));
@@ -631,14 +626,7 @@ fn test_create_with_array_field() {
 fn test_meta_distinct_no_filter() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
-        .args([
-            "create",
-            "task",
-            "--title",
-            "T1",
-            "--id",
-            "task-nf1",
-        ])
+        .args(["create", "task", "--title", "T1", "--id", "task-nf1"])
         .assert()
         .success();
     cortx_cmd(&vault)
@@ -723,15 +711,27 @@ fn test_meta_count_by_array_field() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
         .args([
-            "create", "task", "--title", "T1", "--id", "task-cba1",
-            "--tags", "alpha,beta",
+            "create",
+            "task",
+            "--title",
+            "T1",
+            "--id",
+            "task-cba1",
+            "--tags",
+            "alpha,beta",
         ])
         .assert()
         .success();
     cortx_cmd(&vault)
         .args([
-            "create", "task", "--title", "T2", "--id", "task-cba2",
-            "--tags", "beta,gamma",
+            "create",
+            "task",
+            "--title",
+            "T2",
+            "--id",
+            "task-cba2",
+            "--tags",
+            "beta,gamma",
         ])
         .assert()
         .success();

@@ -3,6 +3,7 @@ mod common;
 use common::TestVault;
 use cortx::storage::markdown::MarkdownRepository;
 use cortx::storage::Repository;
+use cortx::storage::file_lock::FileLock;
 use cortx::schema::registry::TypeRegistry;
 use cortx::value::Value;
 use std::collections::HashMap;
@@ -98,4 +99,69 @@ fn test_delete_entity() {
 
     repo.delete("task-del", &registry).unwrap();
     assert!(!vault.file_exists("1_Projects/tasks/task-del.md"));
+}
+
+#[test]
+fn test_file_lock_acquire_and_release() {
+    let vault = TestVault::new();
+    let lock_path = vault.path().join("test.md");
+    std::fs::write(&lock_path, "test").unwrap();
+
+    let lock = FileLock::acquire(&lock_path).unwrap();
+    assert!(vault.path().join("test.md.lock").exists());
+
+    lock.release().unwrap();
+    assert!(!vault.path().join("test.md.lock").exists());
+}
+
+#[test]
+fn test_file_lock_contention() {
+    let vault = TestVault::new();
+    let lock_path = vault.path().join("test.md");
+    std::fs::write(&lock_path, "test").unwrap();
+
+    let lock1 = FileLock::acquire(&lock_path).unwrap();
+
+    let lock2 = FileLock::acquire(&lock_path);
+    assert!(lock2.is_err());
+    let err = lock2.unwrap_err().to_string();
+    assert!(err.contains("locked"), "error should mention lock: {err}");
+
+    lock1.release().unwrap();
+
+    let lock3 = FileLock::acquire(&lock_path).unwrap();
+    lock3.release().unwrap();
+}
+
+#[test]
+fn test_file_lock_drop_releases() {
+    let vault = TestVault::new();
+    let lock_path = vault.path().join("test.md");
+    std::fs::write(&lock_path, "test").unwrap();
+
+    {
+        let _lock = FileLock::acquire(&lock_path).unwrap();
+        assert!(vault.path().join("test.md.lock").exists());
+    }
+    assert!(!vault.path().join("test.md.lock").exists());
+}
+
+#[test]
+fn test_update_with_locking() {
+    let vault = TestVault::new();
+    let registry = test_registry();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    vault.write_file(
+        "1_Projects/tasks/task-lock.md",
+        "---\nid: task-lock\ntype: task\ntitle: Lock test\nstatus: open\ntags: []\n---\n",
+    );
+
+    let mut updates = HashMap::new();
+    updates.insert("status".into(), Value::String("done".into()));
+
+    let entity = repo.update("task-lock", updates, &registry).unwrap();
+    assert_eq!(entity.get("status").unwrap(), &Value::String("done".into()));
+
+    assert!(!vault.file_exists("1_Projects/tasks/task-lock.md.lock"));
 }

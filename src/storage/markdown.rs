@@ -10,6 +10,7 @@ use crate::schema::registry::TypeRegistry;
 use crate::schema::validation::validate_frontmatter;
 use crate::value::Value;
 use super::Repository;
+use super::file_lock;
 
 pub struct MarkdownRepository {
     vault_path: PathBuf,
@@ -125,6 +126,10 @@ impl Repository for MarkdownRepository {
         registry: &TypeRegistry,
     ) -> Result<Entity> {
         let path = self.find_file_by_id(id, registry)?;
+
+        // Acquire file lock
+        let lock = file_lock::FileLock::acquire(&path)?;
+
         let mut entity = self.read_entity(&path)?;
 
         for (key, val) in updates {
@@ -143,13 +148,21 @@ impl Repository for MarkdownRepository {
         let content = serialize_entity(&entity.frontmatter, &entity.body);
         std::fs::write(&path, content)?;
 
+        lock.release()?;
+
         entity.file_path = Some(path);
         Ok(entity)
     }
 
     fn delete(&self, id: &str, registry: &TypeRegistry) -> Result<()> {
         let path = self.find_file_by_id(id, registry)?;
+
+        let lock = file_lock::FileLock::acquire(&path)?;
+
         std::fs::remove_file(&path)?;
+
+        lock.release()?;
+
         Ok(())
     }
 

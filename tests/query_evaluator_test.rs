@@ -5,6 +5,89 @@ use cortx::query::parser::parse_query;
 use cortx::value::Value;
 use std::collections::HashMap;
 
+fn make_entity(fields: Vec<(&str, Value)>, body: &str) -> Entity {
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("e-001".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    for (k, v) in fields {
+        fm.insert(k.into(), v);
+    }
+    Entity::new(fm, body.into())
+}
+
+// -- Missing field behavior --
+
+#[test]
+fn test_eval_missing_field_eq_returns_false() {
+    let entity = make_entity(vec![], "");
+    let expr = parse_query(r#"status = "open""#).unwrap();
+    assert!(!evaluate(&expr, &entity));
+}
+
+#[test]
+fn test_eval_missing_field_ne_returns_true() {
+    let entity = make_entity(vec![], "");
+    let expr = parse_query(r#"status != "open""#).unwrap();
+    assert!(evaluate(&expr, &entity));
+}
+
+#[test]
+fn test_eval_missing_field_lt_returns_false() {
+    let entity = make_entity(vec![], "");
+    let expr = parse_query(r#"due < "2026-04-01""#).unwrap();
+    assert!(!evaluate(&expr, &entity));
+}
+
+#[test]
+fn test_eval_missing_field_contains_returns_false() {
+    let entity = make_entity(vec![], "");
+    let expr = parse_query(r#"tags contains "home""#).unwrap();
+    assert!(!evaluate(&expr, &entity));
+}
+
+#[test]
+fn test_eval_missing_field_in_returns_false() {
+    let entity = make_entity(vec![], "");
+    let expr = parse_query(r#"status in ["open", "done"]"#).unwrap();
+    assert!(!evaluate(&expr, &entity));
+}
+
+#[test]
+fn test_eval_missing_field_between_returns_false() {
+    let entity = make_entity(vec![], "");
+    let expr = parse_query(r#"due between ["2026-01-01", "2026-12-31"]"#).unwrap();
+    assert!(!evaluate(&expr, &entity));
+}
+
+// -- Comparison operators: Le, Gt, Ge --
+
+#[test]
+fn test_eval_date_le() {
+    let entity = make_task("open", "2026-04-01", vec![]);
+    let expr = parse_query(r#"due <= "2026-04-01""#).unwrap();
+    assert!(evaluate(&expr, &entity));
+    let expr2 = parse_query(r#"due <= "2026-03-31""#).unwrap();
+    assert!(!evaluate(&expr2, &entity));
+}
+
+#[test]
+fn test_eval_date_gt() {
+    let entity = make_task("open", "2026-04-15", vec![]);
+    let expr = parse_query(r#"due > "2026-04-01""#).unwrap();
+    assert!(evaluate(&expr, &entity));
+    let expr2 = parse_query(r#"due > "2026-04-15""#).unwrap();
+    assert!(!evaluate(&expr2, &entity));
+}
+
+#[test]
+fn test_eval_date_ge() {
+    let entity = make_task("open", "2026-04-15", vec![]);
+    let expr = parse_query(r#"due >= "2026-04-15""#).unwrap();
+    assert!(evaluate(&expr, &entity));
+    let expr2 = parse_query(r#"due >= "2026-04-16""#).unwrap();
+    assert!(!evaluate(&expr2, &entity));
+}
+
 fn make_task(status: &str, due: &str, tags: Vec<&str>) -> Entity {
     let mut fm = HashMap::new();
     fm.insert("id".into(), Value::String("task-001".into()));

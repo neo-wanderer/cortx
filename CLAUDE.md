@@ -24,9 +24,17 @@ cargo test --test cli_integration_test -- test_create_and_show  # Run a single t
 cargo test --doc               # Run doctests only
 cargo bench                    # Run performance benchmarks (criterion)
 cargo clippy -- -W clippy::all # Lint
+cargo llvm-cov --ignore-filename-regex "(main|file_lock|markdown)\.rs" # Coverage
 ```
 
 Tests use a `TestVault` helper (`tests/common/mod.rs`) that creates a `TempDir` with the required vault folder structure. Integration tests live in `tests/` (query_parser, storage, value, schema, frontmatter, cli_integration).
+
+### Coverage exclusions
+
+`main.rs`, `storage/file_lock.rs`, and `storage/markdown.rs` are excluded from coverage reports:
+- **main.rs**: `process::exit(1)` error handlers and `unreachable!()` branch — untestable from integration tests
+- **file_lock.rs**: OS-level IO error path requires a rare filesystem failure to trigger
+- **markdown.rs**: IO error propagation and empty-dir early returns are OS-dependent edge cases
 
 ## CLI Commands
 

@@ -168,3 +168,32 @@ fn test_update_with_locking() {
 
     assert!(!vault.file_exists("1_Projects/tasks/task-lock.md.lock"));
 }
+
+#[test]
+fn test_create_duplicate_entity() {
+    let vault = TestVault::new();
+    let registry = test_registry();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("task-dup".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("First".into()));
+    fm.insert("status".into(), Value::String("open".into()));
+    fm.insert("tags".into(), Value::Array(vec![]));
+
+    repo.create(fm.clone(), "", &registry).unwrap();
+
+    let err = repo.create(fm, "", &registry).unwrap_err();
+    assert!(err.to_string().contains("already exists"));
+}
+
+#[test]
+fn test_get_nonexistent_entity() {
+    let vault = TestVault::new();
+    let registry = test_registry();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let err = repo.get_by_id("nonexistent", &registry).unwrap_err();
+    assert!(err.to_string().contains("not found"));
+}

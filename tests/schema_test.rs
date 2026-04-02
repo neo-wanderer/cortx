@@ -1,5 +1,5 @@
 use cortx::schema::registry::TypeRegistry;
-use cortx::schema::types::{FieldType, TypeDefinition};
+use cortx::schema::types::FieldType;
 use cortx::schema::validation::validate_frontmatter;
 use cortx::value::Value;
 use std::collections::HashMap;
@@ -113,6 +113,8 @@ types:
       status: { enum: [open, in_progress, done] }
       due:    { type: date }
       tags:   { type: "array[string]", default: "[]" }
+      active: { type: bool }
+      priority: { type: number }
 "#;
     TypeRegistry::from_yaml_str(yaml).unwrap()
 }
@@ -185,4 +187,230 @@ fn test_validate_date_field_accepts_date() {
     );
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_ok());
+}
+
+#[test]
+fn test_validate_date_field_rejects_bad_string() {
+    let registry = make_registry();
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("task-001".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Do thing".into()));
+    fm.insert("status".into(), Value::String("open".into()));
+    fm.insert("due".into(), Value::String("not-a-date".into()));
+    let result = validate_frontmatter(&fm, registry.get("task").unwrap());
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("must be a date"));
+}
+
+#[test]
+fn test_validate_date_field_rejects_non_string_non_date() {
+    let registry = make_registry();
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("task-001".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Do thing".into()));
+    fm.insert("status".into(), Value::String("open".into()));
+    fm.insert("due".into(), Value::Bool(true));
+    let result = validate_frontmatter(&fm, registry.get("task").unwrap());
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("must be a date"));
+}
+
+#[test]
+fn test_validate_array_field_rejects_non_array() {
+    let registry = make_registry();
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("task-001".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Do thing".into()));
+    fm.insert("status".into(), Value::String("open".into()));
+    fm.insert("tags".into(), Value::String("not-an-array".into()));
+    let result = validate_frontmatter(&fm, registry.get("task").unwrap());
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("must be an array"));
+}
+
+#[test]
+fn test_validate_array_field_accepts_null() {
+    let registry = make_registry();
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("task-001".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Do thing".into()));
+    fm.insert("status".into(), Value::String("open".into()));
+    fm.insert("tags".into(), Value::Null);
+    let result = validate_frontmatter(&fm, registry.get("task").unwrap());
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_validate_bool_field_rejects_non_bool() {
+    let registry = make_registry();
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("task-001".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Do thing".into()));
+    fm.insert("status".into(), Value::String("open".into()));
+    fm.insert("active".into(), Value::String("yes".into()));
+    let result = validate_frontmatter(&fm, registry.get("task").unwrap());
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("must be a boolean"));
+}
+
+#[test]
+fn test_validate_number_field_rejects_non_number() {
+    let registry = make_registry();
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("task-001".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Do thing".into()));
+    fm.insert("status".into(), Value::String("open".into()));
+    fm.insert("priority".into(), Value::String("high".into()));
+    let result = validate_frontmatter(&fm, registry.get("task").unwrap());
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("must be a number"));
+}
+
+#[test]
+fn test_validate_multiple_errors() {
+    let registry = make_registry();
+    let fm = HashMap::new(); // missing all required fields
+    let result = validate_frontmatter(&fm, registry.get("task").unwrap());
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("id"));
+    assert!(err.contains("type"));
+    assert!(err.contains("title"));
+    assert!(err.contains("status"));
+}
+
+#[test]
+fn test_validate_unknown_fields_allowed() {
+    let registry = make_registry();
+    let mut fm = HashMap::new();
+    fm.insert("id".into(), Value::String("task-001".into()));
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Do thing".into()));
+    fm.insert("status".into(), Value::String("open".into()));
+    fm.insert("custom_field".into(), Value::String("anything".into()));
+    let result = validate_frontmatter(&fm, registry.get("task").unwrap());
+    assert!(result.is_ok());
+}
+
+// -- Registry edge cases --
+
+#[test]
+fn test_registry_missing_types_key() {
+    let yaml = r#"
+something_else:
+  task:
+    folder: "tasks"
+"#;
+    let err = TypeRegistry::from_yaml_str(yaml).unwrap_err();
+    assert!(err.to_string().contains("missing 'types'"));
+}
+
+#[test]
+fn test_registry_unknown_field_type() {
+    let yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: []
+    fields:
+      data: { type: "binary" }
+"#;
+    let err = TypeRegistry::from_yaml_str(yaml).unwrap_err();
+    assert!(err.to_string().contains("unknown field type"));
+}
+
+#[test]
+fn test_registry_link_field_type() {
+    let yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: []
+    fields:
+      owner: { type: link, ref: person }
+"#;
+    let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
+    let task_def = registry.get("task").unwrap();
+    assert!(matches!(
+        task_def.fields["owner"].field_type,
+        FieldType::Link { .. }
+    ));
+}
+
+#[test]
+fn test_registry_datetime_field_type() {
+    let yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: []
+    fields:
+      created: { type: datetime }
+"#;
+    let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
+    let task_def = registry.get("task").unwrap();
+    assert_eq!(task_def.fields["created"].field_type, FieldType::Datetime);
+}
+
+#[test]
+fn test_registry_bool_field_type() {
+    let yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: []
+    fields:
+      active: { type: bool }
+"#;
+    let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
+    let task_def = registry.get("task").unwrap();
+    assert_eq!(task_def.fields["active"].field_type, FieldType::Bool);
+}
+
+#[test]
+fn test_registry_number_field_type() {
+    let yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: []
+    fields:
+      priority: { type: number }
+"#;
+    let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
+    let task_def = registry.get("task").unwrap();
+    assert_eq!(
+        task_def.fields["priority"].field_type,
+        FieldType::Number
+    );
+}
+
+#[test]
+fn test_registry_default_field_type_without_type_key() {
+    let yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: []
+    fields:
+      notes: {}
+"#;
+    let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
+    let task_def = registry.get("task").unwrap();
+    assert_eq!(task_def.fields["notes"].field_type, FieldType::String);
 }

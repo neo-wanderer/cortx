@@ -77,3 +77,18 @@ fn test_serialize_entity_roundtrip() {
     );
     assert_eq!(parsed_body.trim(), body.trim());
 }
+
+#[test]
+fn test_parse_frontmatter_unclosed() {
+    let content = "---\nid: task-001\ntype: task\n";
+    let err = parse_frontmatter(content).unwrap_err();
+    assert!(err.to_string().contains("unclosed"));
+}
+
+#[test]
+fn test_parse_frontmatter_not_a_mapping() {
+    // YAML that parses as a scalar, not a mapping
+    let content = "---\njust a string\n---\nBody\n";
+    let err = parse_frontmatter(content).unwrap_err();
+    assert!(err.to_string().contains("mapping"));
+}

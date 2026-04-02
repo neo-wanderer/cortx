@@ -1,0 +1,96 @@
+types:
+  task:
+    folder: "1_Projects/tasks"
+    required: [id, type, title, status]
+    fields:
+      id:         { type: string }
+      type:       { const: task }
+      title:      { type: string }
+      status:     { enum: [open, in_progress, waiting, done, cancelled] }
+      project:    { type: link, ref: project }
+      area:       { type: link, ref: area }
+      assignee:   { type: link, ref: person }
+      created_at: { type: date }
+      updated_at: { type: date }
+      scheduled:  { type: date }
+      due:        { type: date }
+      tags:       { type: "array[string]", default: "[]" }
+
+  project:
+    folder: "1_Projects"
+    required: [id, type, title, status]
+    fields:
+      id:         { type: string }
+      type:       { const: project }
+      title:      { type: string }
+      status:     { enum: [active, on_hold, completed, cancelled, archived] }
+      area:       { type: link, ref: area }
+      owner:      { type: link, ref: person }
+      due:        { type: date }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
+
+  area:
+    folder: "2_Areas"
+    required: [id, type, title, status]
+    fields:
+      id:         { type: string }
+      type:       { const: area }
+      title:      { type: string }
+      status:     { enum: [active, archived] }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
+
+  resource:
+    folder: "3_Resources"
+    required: [id, type, title]
+    fields:
+      id:         { type: string }
+      type:       { const: resource }
+      title:      { type: string }
+      area:       { type: link, ref: area }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
+
+  note:
+    folder: "3_Resources/notes"
+    required: [id, type, title]
+    fields:
+      id:         { type: string }
+      type:       { const: note }
+      title:      { type: string }
+      area:       { type: link, ref: area }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
+
+  person:
+    folder: "5_People"
+    required: [id, type, name]
+    fields:
+      id:           { type: string }
+      type:         { const: person }
+      name:         { type: string }
+      relationship: { enum: [personal, professional, family, other] }
+      company:      { type: link, ref: company }
+      email:        { type: string }
+      phone:        { type: string }
+      created_at:   { type: date }
+      updated_at:   { type: date }
+      tags:         { type: "array[string]", default: "[]" }
+
+  company:
+    folder: "5_Companies"
+    required: [id, type, name]
+    fields:
+      id:         { type: string }
+      type:       { const: company }
+      name:       { type: string }
+      domain:     { type: string }
+      industry:   { type: string }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }

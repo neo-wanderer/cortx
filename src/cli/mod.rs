@@ -7,6 +7,7 @@ pub mod query_cmd;
 pub mod meta;
 pub mod note;
 pub mod doctor;
+pub mod init;
 
 use clap::{Parser, Subcommand};
 
@@ -22,6 +23,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    /// Initialize a new vault
+    Init(init::InitArgs),
     /// Create a new entity
     Create(create::CreateArgs),
     /// Show an entity by ID

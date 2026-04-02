@@ -15,6 +15,15 @@ use config::Config;
 fn main() {
     let cli = Cli::parse();
 
+    // Init doesn't need config
+    if let Commands::Init(args) = &cli.command {
+        if let Err(e) = cli::init::run(args) {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let config = match Config::load(cli.vault.as_deref()) {
         Ok(c) => c,
         Err(e) => {
@@ -24,6 +33,7 @@ fn main() {
     };
 
     let result = match &cli.command {
+        Commands::Init(_) => unreachable!(),
         Commands::Create(args) => cli::create::run(args, &config),
         Commands::Show(args) => cli::show::run(args, &config),
         Commands::Update(args) => cli::update::run(args, &config),

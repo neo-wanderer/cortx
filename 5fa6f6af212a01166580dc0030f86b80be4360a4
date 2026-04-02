@@ -1,0 +1,25 @@
+src/schema/validation.rs
+  c0593ce2c66909fa 1-89
+tests/schema_test.rs
+  c0593ce2c66909fa 3-5,100-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "5fa6f6af212a01166580dc0030f86b80be4360a4",
+  "prompts": {
+    "c0593ce2c66909fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1de05e4a-6611-4548-887f-75fa25a1e2e2",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "vigneshnrfs",
+      "messages": [],
+      "total_additions": 173,
+      "total_deletions": 1,
+      "accepted_lines": 173,
+      "overriden_lines": 0
+    }
+  }
+}

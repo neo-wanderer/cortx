@@ -19,3 +19,8 @@ regex = "1"
 tempfile = "3"
 assert_cmd = "2"
 predicates = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "query_bench"
+harness = false

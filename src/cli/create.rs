@@ -48,13 +48,12 @@ pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
         fm.insert("name".into(), Value::String(name.clone()));
     }
 
-    if let Some(type_def) = config.registry.get(&args.entity_type) {
-        if type_def.fields.contains_key("status")
+    if let Some(type_def) = config.registry.get(&args.entity_type)
+        && type_def.fields.contains_key("status")
             && !args.fields.iter().any(|f| f.starts_with("status="))
         {
             fm.insert("status".into(), Value::String("open".into()));
         }
-    }
 
     if let Some(tags) = &args.tags {
         let tag_list: Vec<Value> = tags

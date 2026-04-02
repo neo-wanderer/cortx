@@ -21,23 +21,21 @@ pub fn validate_frontmatter(
         if let Some(field_def) = type_def.fields.get(field_name) {
             match &field_def.field_type {
                 FieldType::Const(expected) => {
-                    if let Value::String(s) = value {
-                        if s != expected {
+                    if let Value::String(s) = value
+                        && s != expected {
                             errors.push(format!(
                                 "field '{field_name}' must be '{expected}', got '{s}'"
                             ));
                         }
-                    }
                 }
                 FieldType::Enum(variants) => {
-                    if let Value::String(s) = value {
-                        if !variants.contains(s) {
+                    if let Value::String(s) = value
+                        && !variants.contains(s) {
                             errors.push(format!(
                                 "field '{field_name}' must be one of [{}], got '{s}'",
                                 variants.join(", ")
                             ));
                         }
-                    }
                 }
                 FieldType::Date => {
                     match value {

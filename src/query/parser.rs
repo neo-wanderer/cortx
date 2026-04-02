@@ -152,9 +152,9 @@ fn parse_primary(tokens: &[Token], pos: &mut usize) -> Result<Expr> {
     }
 
     // text ~ "pattern"
-    if field == "text" {
-        if let Token::Op(op) = &tokens[*pos] {
-            if op == "~" {
+    if field == "text"
+        && let Token::Op(op) = &tokens[*pos]
+            && op == "~" {
                 *pos += 1;
                 let pattern = parse_value(tokens, pos)?;
                 if let Value::String(s) = pattern {
@@ -162,8 +162,6 @@ fn parse_primary(tokens: &[Token], pos: &mut usize) -> Result<Expr> {
                 }
                 return Err(CortxError::QueryParse("text search pattern must be a string".into()));
             }
-        }
-    }
 
     if matches!(&tokens[*pos], Token::Ident(s) if s == "contains") {
         *pos += 1;

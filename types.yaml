@@ -6,7 +6,7 @@ types:
       id:         { type: string }
       type:       { const: task }
       title:      { type: string }
-      status:     { enum: [open, in_progress, waiting, done, cancelled] }
+      status:     { enum: [open, in_progress, waiting, done, cancelled, archived] }
       project:    { type: link, ref: project }
       area:       { type: link, ref: area }
       assignee:   { type: link, ref: person }

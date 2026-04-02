@@ -29,12 +29,11 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
             let mut errors = 0;
 
             for entity in &all {
-                if let Some(type_def) = config.registry.get(&entity.entity_type) {
-                    if let Err(e) = validate_frontmatter(&entity.frontmatter, type_def) {
+                if let Some(type_def) = config.registry.get(&entity.entity_type)
+                    && let Err(e) = validate_frontmatter(&entity.frontmatter, type_def) {
                         errors += 1;
                         println!("ERROR in {} ({}): {e}", entity.id, entity.entity_type);
                     }
-                }
             }
 
             if errors == 0 {

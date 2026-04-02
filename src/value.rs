@@ -27,7 +27,7 @@ impl Value {
                 Value::Number(n.as_f64().unwrap_or(0.0))
             }
             serde_yaml::Value::Sequence(seq) => {
-                Value::Array(seq.iter().map(|v| Value::from_yaml(v)).collect())
+                Value::Array(seq.iter().map(Value::from_yaml).collect())
             }
             serde_yaml::Value::Null => Value::Null,
             serde_yaml::Value::Tagged(tagged) => Value::from_yaml(&tagged.value),

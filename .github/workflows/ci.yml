@@ -18,9 +18,12 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: rustfmt, clippy, llvm-tools-preview
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Format
         run: cargo fmt --all -- --check
@@ -28,5 +31,5 @@ jobs:
       - name: Clippy
         run: cargo clippy -- -W clippy::all
 
-      - name: Test
-        run: cargo test
+      - name: Test with coverage
+        run: cargo llvm-cov --fail-under-lines 95

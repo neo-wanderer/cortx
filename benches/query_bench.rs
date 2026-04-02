@@ -60,7 +60,7 @@ fn bench_query_scan(c: &mut Criterion) {
     let mut group = c.benchmark_group("query_scan");
     group.sample_size(10);
 
-    for size in [100, 500, 1000, 5000] {
+    for size in [100, 500, 1000, 5000, 10000, 20000] {
         let dir = TempDir::new().unwrap();
         generate_vault(dir.path(), size);
         let repo = MarkdownRepository::new(dir.path().to_path_buf());

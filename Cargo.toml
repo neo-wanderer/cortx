@@ -2,6 +2,12 @@
 name = "cortx"
 version = "0.1.0"
 edition = "2024"
+description = "Schema-driven CLI for managing Second Brain entities as Markdown files with YAML frontmatter"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/neo-wanderer/cortx"
+authors = ["cortx contributors"]
+keywords = ["cli", "second-brain", "markdown", "gtd", "para"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -19,7 +25,7 @@ regex = "1"
 tempfile = "3"
 assert_cmd = "2"
 predicates = "3"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]
 name = "query_bench"

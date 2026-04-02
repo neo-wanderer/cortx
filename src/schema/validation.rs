@@ -3,6 +3,41 @@ use crate::error::{CortxError, Result};
 use crate::value::Value;
 use super::types::{FieldType, TypeDefinition};
 
+/// Validate a frontmatter HashMap against a TypeDefinition schema.
+///
+/// Checks required fields, enum values, const fields, date formats,
+/// and array types.
+///
+/// # Examples
+///
+/// ```
+/// use cortx::schema::registry::TypeRegistry;
+/// use cortx::schema::validation::validate_frontmatter;
+/// use cortx::value::Value;
+/// use std::collections::HashMap;
+///
+/// let yaml = r#"
+/// types:
+///   task:
+///     folder: "tasks"
+///     required: [id, type, status]
+///     fields:
+///       id:     { type: string }
+///       type:   { const: task }
+///       status: { enum: [open, done] }
+/// "#;
+/// let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
+/// let type_def = registry.get("task").unwrap();
+///
+/// let mut fm = HashMap::new();
+/// fm.insert("id".into(), Value::String("t1".into()));
+/// fm.insert("type".into(), Value::String("task".into()));
+/// fm.insert("status".into(), Value::String("open".into()));
+/// assert!(validate_frontmatter(&fm, type_def).is_ok());
+///
+/// fm.insert("status".into(), Value::String("invalid".into()));
+/// assert!(validate_frontmatter(&fm, type_def).is_err());
+/// ```
 pub fn validate_frontmatter(
     frontmatter: &HashMap<String, Value>,
     type_def: &TypeDefinition,

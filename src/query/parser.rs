@@ -2,6 +2,27 @@ use crate::error::{CortxError, Result};
 use crate::value::Value;
 use super::ast::{CompareOp, Expr};
 
+/// Parse a query string into an expression AST.
+///
+/// Supports: `=`, `!=`, `<`, `<=`, `>`, `>=`, `contains`, `in`, `between`,
+/// `text ~`, `and`, `or`, `not`, and parenthesized grouping.
+///
+/// # Examples
+///
+/// ```
+/// use cortx::query::parser::parse_query;
+/// use cortx::query::ast::{Expr, CompareOp};
+/// use cortx::value::Value;
+///
+/// let expr = parse_query(r#"status = "open""#).unwrap();
+/// assert!(matches!(expr, Expr::Compare { .. }));
+///
+/// let expr = parse_query(r#"tags contains "home""#).unwrap();
+/// assert!(matches!(expr, Expr::Contains { .. }));
+///
+/// let expr = parse_query(r#"status = "open" and due < today"#).unwrap();
+/// assert!(matches!(expr, Expr::And(_, _)));
+/// ```
 pub fn parse_query(input: &str) -> Result<Expr> {
     let tokens = tokenize(input)?;
     let mut pos = 0;

@@ -7,6 +7,11 @@ use crate::error::Result;
 use crate::schema::registry::TypeRegistry;
 use crate::value::Value;
 
+/// Storage abstraction for entity persistence.
+///
+/// Implementations handle the details of where and how entities are stored.
+/// The Markdown adapter (`MarkdownRepository`) stores entities as `.md` files
+/// with YAML frontmatter. Future adapters (e.g., SQLite) implement the same trait.
 pub trait Repository {
     fn create(
         &self,

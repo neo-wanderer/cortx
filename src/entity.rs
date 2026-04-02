@@ -2,6 +2,28 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use crate::value::Value;
 
+/// A Second Brain entity parsed from a Markdown file.
+///
+/// Each entity has YAML frontmatter (structured metadata) and a Markdown body.
+/// The `id` and `entity_type` are extracted from frontmatter for convenience.
+///
+/// # Examples
+///
+/// ```
+/// use cortx::entity::Entity;
+/// use cortx::value::Value;
+/// use std::collections::HashMap;
+///
+/// let mut fm = HashMap::new();
+/// fm.insert("id".into(), Value::String("task-1".into()));
+/// fm.insert("type".into(), Value::String("task".into()));
+/// fm.insert("title".into(), Value::String("Buy milk".into()));
+///
+/// let entity = Entity::new(fm, "# Notes\n".into());
+/// assert_eq!(entity.id, "task-1");
+/// assert_eq!(entity.entity_type, "task");
+/// assert_eq!(entity.title(), "Buy milk");
+/// ```
 #[derive(Debug, Clone)]
 pub struct Entity {
     pub id: String,

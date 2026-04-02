@@ -13,6 +13,25 @@ pub enum Value {
 }
 
 impl Value {
+    /// Convert a `serde_yaml::Value` into a typed `Value`.
+    ///
+    /// Strings that look like ISO dates (`YYYY-MM-DD`) are automatically
+    /// parsed as `Value::Date`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cortx::value::Value;
+    ///
+    /// let yaml: serde_yaml::Value = serde_yaml::from_str("\"hello\"").unwrap();
+    /// assert_eq!(Value::from_yaml(&yaml), Value::String("hello".into()));
+    ///
+    /// let yaml: serde_yaml::Value = serde_yaml::from_str("\"2026-04-02\"").unwrap();
+    /// assert!(matches!(Value::from_yaml(&yaml), Value::Date(_)));
+    ///
+    /// let yaml: serde_yaml::Value = serde_yaml::from_str("[a, b]").unwrap();
+    /// assert!(matches!(Value::from_yaml(&yaml), Value::Array(_)));
+    /// ```
     pub fn from_yaml(yaml: &serde_yaml::Value) -> Self {
         match yaml {
             serde_yaml::Value::String(s) => {
@@ -35,6 +54,18 @@ impl Value {
         }
     }
 
+    /// Try to parse a string as an ISO date (`YYYY-MM-DD`).
+    ///
+    /// Returns `Some(Value::Date(...))` on success, `None` on failure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cortx::value::Value;
+    ///
+    /// assert!(Value::parse_as_date("2026-04-02").is_some());
+    /// assert!(Value::parse_as_date("not-a-date").is_none());
+    /// ```
     pub fn parse_as_date(s: &str) -> Option<Value> {
         NaiveDate::parse_from_str(s, "%Y-%m-%d")
             .ok()
@@ -55,6 +86,23 @@ impl Value {
         }
     }
 
+    /// Check if an array value contains the given item.
+    ///
+    /// Returns `false` for non-array values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cortx::value::Value;
+    ///
+    /// let arr = Value::Array(vec![
+    ///     Value::String("home".into()),
+    ///     Value::String("work".into()),
+    /// ]);
+    /// assert!(arr.contains(&Value::String("home".into())));
+    /// assert!(!arr.contains(&Value::String("urgent".into())));
+    /// assert!(!Value::String("not array".into()).contains(&Value::String("x".into())));
+    /// ```
     pub fn contains(&self, item: &Value) -> bool {
         match self {
             Value::Array(arr) => arr.contains(item),

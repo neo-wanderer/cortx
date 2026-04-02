@@ -2,6 +2,25 @@ use std::collections::HashMap;
 use crate::error::{CortxError, Result};
 use crate::value::Value;
 
+/// Parse a Markdown file's content into (frontmatter HashMap, body string).
+///
+/// Expects `---` delimited YAML frontmatter at the top of the content.
+///
+/// # Examples
+///
+/// ```
+/// use cortx::frontmatter::parse_frontmatter;
+/// use cortx::value::Value;
+///
+/// let content = "---\nid: task-1\ntype: task\n---\n# Body\n";
+/// let (fm, body) = parse_frontmatter(content).unwrap();
+/// assert_eq!(fm.get("id").unwrap(), &Value::String("task-1".into()));
+/// assert!(body.contains("# Body"));
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if no `---` delimiters are found.
 pub fn parse_frontmatter(content: &str) -> Result<(HashMap<String, Value>, String)> {
     let trimmed = content.trim_start();
     if !trimmed.starts_with("---") {
@@ -32,6 +51,26 @@ pub fn parse_frontmatter(content: &str) -> Result<(HashMap<String, Value>, Strin
     Ok((fm, body))
 }
 
+/// Serialize a frontmatter HashMap and body back into a Markdown string.
+///
+/// Keys are sorted alphabetically for deterministic output.
+///
+/// # Examples
+///
+/// ```
+/// use cortx::frontmatter::serialize_entity;
+/// use cortx::value::Value;
+/// use std::collections::HashMap;
+///
+/// let mut fm = HashMap::new();
+/// fm.insert("id".into(), Value::String("task-1".into()));
+/// fm.insert("type".into(), Value::String("task".into()));
+///
+/// let output = serialize_entity(&fm, "# Notes\n");
+/// assert!(output.starts_with("---\n"));
+/// assert!(output.contains("id: task-1"));
+/// assert!(output.ends_with("# Notes\n"));
+/// ```
 pub fn serialize_entity(frontmatter: &HashMap<String, Value>, body: &str) -> String {
     let mut yaml_map = serde_yaml::Mapping::new();
 

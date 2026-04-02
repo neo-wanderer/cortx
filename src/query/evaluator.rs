@@ -2,6 +2,29 @@ use crate::entity::Entity;
 use crate::value::Value;
 use super::ast::{CompareOp, Expr};
 
+/// Evaluate a query expression against an entity. Returns `true` if the entity matches.
+///
+/// # Examples
+///
+/// ```
+/// use cortx::query::parser::parse_query;
+/// use cortx::query::evaluator::evaluate;
+/// use cortx::entity::Entity;
+/// use cortx::value::Value;
+/// use std::collections::HashMap;
+///
+/// let mut fm = HashMap::new();
+/// fm.insert("id".into(), Value::String("t1".into()));
+/// fm.insert("type".into(), Value::String("task".into()));
+/// fm.insert("status".into(), Value::String("open".into()));
+/// let entity = Entity::new(fm, "some body".into());
+///
+/// let expr = parse_query(r#"status = "open""#).unwrap();
+/// assert!(evaluate(&expr, &entity));
+///
+/// let expr = parse_query(r#"status = "done""#).unwrap();
+/// assert!(!evaluate(&expr, &entity));
+/// ```
 pub fn evaluate(expr: &Expr, entity: &Entity) -> bool {
     match expr {
         Expr::Compare { field, op, value } => {

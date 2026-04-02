@@ -8,6 +8,26 @@ pub struct TypeRegistry {
 }
 
 impl TypeRegistry {
+    /// Load a TypeRegistry from a YAML string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cortx::schema::registry::TypeRegistry;
+    ///
+    /// let yaml = r#"
+    /// types:
+    ///   task:
+    ///     folder: "tasks"
+    ///     required: [id, type]
+    ///     fields:
+    ///       id:   { type: string }
+    ///       type: { const: task }
+    /// "#;
+    /// let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
+    /// assert!(registry.get("task").is_some());
+    /// assert!(registry.get("unknown").is_none());
+    /// ```
     pub fn from_yaml_str(yaml: &str) -> Result<Self> {
         let root: serde_yaml::Value = serde_yaml::from_str(yaml)?;
         let types_map = root

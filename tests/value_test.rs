@@ -1,5 +1,5 @@
-use cortx::value::Value;
 use chrono::NaiveDate;
+use cortx::value::Value;
 
 #[test]
 fn test_value_from_yaml_string() {
@@ -11,17 +11,23 @@ fn test_value_from_yaml_string() {
 #[test]
 fn test_value_from_yaml_date_string() {
     let val = Value::parse_as_date("2026-04-02");
-    assert_eq!(val, Some(Value::Date(NaiveDate::from_ymd_opt(2026, 4, 2).unwrap())));
+    assert_eq!(
+        val,
+        Some(Value::Date(NaiveDate::from_ymd_opt(2026, 4, 2).unwrap()))
+    );
 }
 
 #[test]
 fn test_value_from_yaml_array() {
     let yaml: serde_yaml::Value = serde_yaml::from_str("[home, urgent]").unwrap();
     let val = Value::from_yaml(&yaml);
-    assert_eq!(val, Value::Array(vec![
-        Value::String("home".to_string()),
-        Value::String("urgent".to_string()),
-    ]));
+    assert_eq!(
+        val,
+        Value::Array(vec![
+            Value::String("home".to_string()),
+            Value::String("urgent".to_string()),
+        ])
+    );
 }
 
 #[test]

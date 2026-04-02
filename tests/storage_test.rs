@@ -1,10 +1,10 @@
 mod common;
 
 use common::TestVault;
-use cortx::storage::markdown::MarkdownRepository;
+use cortx::schema::registry::TypeRegistry;
 use cortx::storage::Repository;
 use cortx::storage::file_lock::FileLock;
-use cortx::schema::registry::TypeRegistry;
+use cortx::storage::markdown::MarkdownRepository;
 use cortx::value::Value;
 use std::collections::HashMap;
 
@@ -43,7 +43,10 @@ fn test_get_entity_by_id() {
 
     let entity = repo.get_by_id("person-jane", &registry).unwrap();
     assert_eq!(entity.id, "person-jane");
-    assert_eq!(entity.get("name").unwrap(), &Value::String("Jane Doe".into()));
+    assert_eq!(
+        entity.get("name").unwrap(),
+        &Value::String("Jane Doe".into())
+    );
 }
 
 #[test]

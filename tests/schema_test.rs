@@ -1,8 +1,8 @@
 use cortx::schema::registry::TypeRegistry;
 use cortx::schema::types::{FieldType, TypeDefinition};
 use cortx::schema::validation::validate_frontmatter;
-use std::collections::HashMap;
 use cortx::value::Value;
+use std::collections::HashMap;
 
 #[test]
 fn test_load_types_yaml() {
@@ -43,9 +43,10 @@ types:
     let task_def = registry.get("task").unwrap();
     assert_eq!(task_def.folder, "tasks");
     assert!(task_def.required.contains(&"id".to_string()));
-    assert_eq!(task_def.fields["status"].field_type, FieldType::Enum(vec![
-        "open".into(), "in_progress".into(), "done".into()
-    ]));
+    assert_eq!(
+        task_def.fields["status"].field_type,
+        FieldType::Enum(vec!["open".into(), "in_progress".into(), "done".into()])
+    );
     assert_eq!(task_def.fields["due"].field_type, FieldType::Date);
     assert_eq!(task_def.fields["tags"].field_type, FieldType::ArrayString);
 }
@@ -62,7 +63,10 @@ types:
 "#;
     let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
     let task_def = registry.get("task").unwrap();
-    assert_eq!(task_def.fields["type"].field_type, FieldType::Const("task".into()));
+    assert_eq!(
+        task_def.fields["type"].field_type,
+        FieldType::Const("task".into())
+    );
 }
 
 #[test]
@@ -86,9 +90,7 @@ types:
 
 #[test]
 fn test_load_real_types_yaml() {
-    let registry = TypeRegistry::from_yaml_file(
-        std::path::Path::new("types.yaml")
-    ).unwrap();
+    let registry = TypeRegistry::from_yaml_file(std::path::Path::new("types.yaml")).unwrap();
     assert!(registry.get("task").is_some());
     assert!(registry.get("project").is_some());
     assert!(registry.get("person").is_some());
@@ -151,7 +153,10 @@ fn test_validate_invalid_enum_value() {
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("kinda_done"), "error should mention bad value: {err}");
+    assert!(
+        err.contains("kinda_done"),
+        "error should mention bad value: {err}"
+    );
 }
 
 #[test]
@@ -174,7 +179,10 @@ fn test_validate_date_field_accepts_date() {
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
-    fm.insert("due".into(), Value::Date(chrono::NaiveDate::from_ymd_opt(2026, 4, 5).unwrap()));
+    fm.insert(
+        "due".into(),
+        Value::Date(chrono::NaiveDate::from_ymd_opt(2026, 4, 5).unwrap()),
+    );
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_ok());
 }

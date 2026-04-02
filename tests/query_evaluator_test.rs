@@ -1,8 +1,8 @@
+use chrono::NaiveDate;
 use cortx::entity::Entity;
 use cortx::query::evaluator::evaluate;
 use cortx::query::parser::parse_query;
 use cortx::value::Value;
-use chrono::NaiveDate;
 use std::collections::HashMap;
 
 fn make_task(status: &str, due: &str, tags: Vec<&str>) -> Entity {

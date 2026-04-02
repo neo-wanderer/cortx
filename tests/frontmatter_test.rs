@@ -1,6 +1,6 @@
+use chrono::NaiveDate;
 use cortx::frontmatter::{parse_frontmatter, serialize_entity};
 use cortx::value::Value;
-use chrono::NaiveDate;
 
 #[test]
 fn test_parse_frontmatter_basic() {
@@ -20,7 +20,10 @@ Some notes here.
     let (fm, body) = parse_frontmatter(content).unwrap();
     assert_eq!(fm.get("id").unwrap(), &Value::String("task-001".into()));
     assert_eq!(fm.get("type").unwrap(), &Value::String("task".into()));
-    assert_eq!(fm.get("title").unwrap(), &Value::String("Do the thing".into()));
+    assert_eq!(
+        fm.get("title").unwrap(),
+        &Value::String("Do the thing".into())
+    );
     assert_eq!(fm.get("status").unwrap(), &Value::String("open".into()));
     assert_eq!(
         fm.get("tags").unwrap(),
@@ -68,6 +71,9 @@ fn test_serialize_entity_roundtrip() {
 
     // Roundtrip
     let (parsed_fm, parsed_body) = parse_frontmatter(&output).unwrap();
-    assert_eq!(parsed_fm.get("id").unwrap(), &Value::String("task-001".into()));
+    assert_eq!(
+        parsed_fm.get("id").unwrap(),
+        &Value::String("task-001".into())
+    );
     assert_eq!(parsed_body.trim(), body.trim());
 }

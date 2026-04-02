@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use super::types::{FieldType, TypeDefinition};
 use crate::error::{CortxError, Result};
 use crate::value::Value;
-use super::types::{FieldType, TypeDefinition};
+use std::collections::HashMap;
 
 /// Validate a frontmatter HashMap against a TypeDefinition schema.
 ///
@@ -57,43 +57,39 @@ pub fn validate_frontmatter(
             match &field_def.field_type {
                 FieldType::Const(expected) => {
                     if let Value::String(s) = value
-                        && s != expected {
-                            errors.push(format!(
-                                "field '{field_name}' must be '{expected}', got '{s}'"
-                            ));
-                        }
+                        && s != expected
+                    {
+                        errors.push(format!(
+                            "field '{field_name}' must be '{expected}', got '{s}'"
+                        ));
+                    }
                 }
                 FieldType::Enum(variants) => {
                     if let Value::String(s) = value
-                        && !variants.contains(s) {
-                            errors.push(format!(
-                                "field '{field_name}' must be one of [{}], got '{s}'",
-                                variants.join(", ")
-                            ));
-                        }
+                        && !variants.contains(s)
+                    {
+                        errors.push(format!(
+                            "field '{field_name}' must be one of [{}], got '{s}'",
+                            variants.join(", ")
+                        ));
+                    }
                 }
-                FieldType::Date => {
-                    match value {
-                        Value::Date(_) => {}
-                        Value::String(s) => {
-                            if Value::parse_as_date(s).is_none() {
-                                errors.push(format!(
-                                    "field '{field_name}' must be a date (YYYY-MM-DD), got '{s}'"
-                                ));
-                            }
-                        }
-                        _ => {
+                FieldType::Date => match value {
+                    Value::Date(_) => {}
+                    Value::String(s) => {
+                        if Value::parse_as_date(s).is_none() {
                             errors.push(format!(
-                                "field '{field_name}' must be a date"
+                                "field '{field_name}' must be a date (YYYY-MM-DD), got '{s}'"
                             ));
                         }
                     }
-                }
+                    _ => {
+                        errors.push(format!("field '{field_name}' must be a date"));
+                    }
+                },
                 FieldType::ArrayString => {
                     if !matches!(value, Value::Array(_) | Value::Null) {
-                        errors.push(format!(
-                            "field '{field_name}' must be an array of strings"
-                        ));
+                        errors.push(format!("field '{field_name}' must be an array of strings"));
                     }
                 }
                 FieldType::Bool => {

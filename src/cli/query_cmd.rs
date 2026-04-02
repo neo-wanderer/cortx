@@ -1,10 +1,10 @@
-use clap::Args;
 use crate::config::Config;
 use crate::error::Result;
 use crate::query::evaluator::evaluate;
 use crate::query::parser::parse_query;
-use crate::storage::markdown::MarkdownRepository;
 use crate::storage::Repository;
+use crate::storage::markdown::MarkdownRepository;
+use clap::Args;
 
 #[derive(Args)]
 pub struct QueryArgs {
@@ -32,11 +32,19 @@ pub fn run(args: &QueryArgs, config: &Config) -> Result<()> {
                 serde_json::Value::Object(map)
             })
             .collect();
-        println!("{}", serde_json::to_string_pretty(&items).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&items).unwrap_or_default()
+        );
     } else {
         println!("Found {} results:\n", matches.len());
         for entity in &matches {
-            println!("- [{}] {} ({})", entity.entity_type, entity.title(), entity.id);
+            println!(
+                "- [{}] {} ({})",
+                entity.entity_type,
+                entity.title(),
+                entity.id
+            );
             if let Some(status) = entity.get("status") {
                 print!("  status: {status}");
             }

@@ -42,9 +42,7 @@ impl Value {
                 Value::String(s.clone())
             }
             serde_yaml::Value::Bool(b) => Value::Bool(*b),
-            serde_yaml::Value::Number(n) => {
-                Value::Number(n.as_f64().unwrap_or(0.0))
-            }
+            serde_yaml::Value::Number(n) => Value::Number(n.as_f64().unwrap_or(0.0)),
             serde_yaml::Value::Sequence(seq) => {
                 Value::Array(seq.iter().map(Value::from_yaml).collect())
             }
@@ -115,9 +113,7 @@ impl Value {
             Value::String(s) => serde_yaml::Value::String(s.clone()),
             Value::Date(d) => serde_yaml::Value::String(d.format("%Y-%m-%d").to_string()),
             Value::Bool(b) => serde_yaml::Value::Bool(*b),
-            Value::Number(n) => {
-                serde_yaml::Value::Number(serde_yaml::Number::from(*n))
-            }
+            Value::Number(n) => serde_yaml::Value::Number(serde_yaml::Number::from(*n)),
             Value::Array(arr) => {
                 serde_yaml::Value::Sequence(arr.iter().map(|v| v.to_yaml()).collect())
             }

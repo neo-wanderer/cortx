@@ -1,8 +1,8 @@
-use clap::{Args, Subcommand};
 use crate::config::Config;
 use crate::error::{CortxError, Result};
-use crate::storage::markdown::MarkdownRepository;
 use crate::storage::Repository;
+use crate::storage::markdown::MarkdownRepository;
+use clap::{Args, Subcommand};
 
 #[derive(Args)]
 pub struct NoteArgs {
@@ -13,9 +13,7 @@ pub struct NoteArgs {
 #[derive(Subcommand)]
 pub enum NoteCommands {
     /// List headings in a note
-    Headings {
-        id: String,
-    },
+    Headings { id: String },
     /// Insert content after a heading
     InsertAfterHeading {
         id: String,
@@ -54,7 +52,11 @@ pub fn run(args: &NoteArgs, config: &Config) -> Result<()> {
                 println!("  Line {line_num}: {heading}");
             }
         }
-        NoteCommands::InsertAfterHeading { id, heading, content } => {
+        NoteCommands::InsertAfterHeading {
+            id,
+            heading,
+            content,
+        } => {
             let entity = repo.get_by_id(id, &config.registry)?;
             let new_body = insert_after_heading(&entity.body, heading, content)?;
 
@@ -62,12 +64,15 @@ pub fn run(args: &NoteArgs, config: &Config) -> Result<()> {
                 .file_path
                 .as_ref()
                 .ok_or_else(|| CortxError::Storage("no file path".into()))?;
-            let file_content =
-                crate::frontmatter::serialize_entity(&entity.frontmatter, &new_body);
+            let file_content = crate::frontmatter::serialize_entity(&entity.frontmatter, &new_body);
             std::fs::write(path, file_content)?;
             println!("Inserted content after '{heading}' in {id}");
         }
-        NoteCommands::ReplaceBlock { id, block_id, content } => {
+        NoteCommands::ReplaceBlock {
+            id,
+            block_id,
+            content,
+        } => {
             let entity = repo.get_by_id(id, &config.registry)?;
             let new_body = replace_block(&entity.body, block_id, content)?;
 
@@ -75,8 +80,7 @@ pub fn run(args: &NoteArgs, config: &Config) -> Result<()> {
                 .file_path
                 .as_ref()
                 .ok_or_else(|| CortxError::Storage("no file path".into()))?;
-            let file_content =
-                crate::frontmatter::serialize_entity(&entity.frontmatter, &new_body);
+            let file_content = crate::frontmatter::serialize_entity(&entity.frontmatter, &new_body);
             std::fs::write(path, file_content)?;
             println!("Replaced block '{block_id}' in {id}");
         }
@@ -132,9 +136,9 @@ fn replace_block(body: &str, block_id: &str, content: &str) -> Result<String> {
     let open_pos = body
         .find(&open_tag)
         .ok_or_else(|| CortxError::Storage(format!("block '{block_id}' not found")))?;
-    let close_pos = body
-        .find(&close_tag)
-        .ok_or_else(|| CortxError::Storage(format!("closing tag for block '{block_id}' not found")))?;
+    let close_pos = body.find(&close_tag).ok_or_else(|| {
+        CortxError::Storage(format!("closing tag for block '{block_id}' not found"))
+    })?;
 
     let before = &body[..open_pos + open_tag.len()];
     let after = &body[close_pos..];

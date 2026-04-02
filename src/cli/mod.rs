@@ -1,18 +1,22 @@
-pub mod create;
-pub mod show;
-pub mod update;
 pub mod archive;
+pub mod create;
 pub mod delete;
-pub mod query_cmd;
-pub mod meta;
-pub mod note;
 pub mod doctor;
 pub mod init;
+pub mod meta;
+pub mod note;
+pub mod query_cmd;
+pub mod show;
+pub mod update;
 
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "cortx", version, about = "Second Brain CLI for agents and humans")]
+#[command(
+    name = "cortx",
+    version,
+    about = "Second Brain CLI for agents and humans"
+)]
 pub struct Cli {
     #[arg(long, global = true)]
     pub vault: Option<String>,

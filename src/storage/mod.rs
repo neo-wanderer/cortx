@@ -1,11 +1,11 @@
 pub mod file_lock;
 pub mod markdown;
 
-use std::collections::HashMap;
 use crate::entity::Entity;
 use crate::error::Result;
 use crate::schema::registry::TypeRegistry;
 use crate::value::Value;
+use std::collections::HashMap;
 
 /// Storage abstraction for entity persistence.
 ///

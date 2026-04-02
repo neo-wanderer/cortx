@@ -1,6 +1,6 @@
+use super::ast::{CompareOp, Expr};
 use crate::error::{CortxError, Result};
 use crate::value::Value;
-use super::ast::{CompareOp, Expr};
 
 /// Parse a query string into an expression AST.
 ///
@@ -70,11 +70,15 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
 
     while i < chars.len() {
         match chars[i] {
-            ' ' | '\t' | '\n' | '\r' => { i += 1; }
+            ' ' | '\t' | '\n' | '\r' => {
+                i += 1;
+            }
             '"' => {
                 i += 1;
                 let start = i;
-                while i < chars.len() && chars[i] != '"' { i += 1; }
+                while i < chars.len() && chars[i] != '"' {
+                    i += 1;
+                }
                 if i >= chars.len() {
                     return Err(CortxError::QueryParse("unclosed string literal".into()));
                 }
@@ -82,34 +86,68 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
                 tokens.push(Token::StringLit(s));
                 i += 1;
             }
-            '(' => { tokens.push(Token::LParen); i += 1; }
-            ')' => { tokens.push(Token::RParen); i += 1; }
-            '[' => { tokens.push(Token::LBracket); i += 1; }
-            ']' => { tokens.push(Token::RBracket); i += 1; }
-            ',' => { tokens.push(Token::Comma); i += 1; }
-            '~' => { tokens.push(Token::Op("~".into())); i += 1; }
+            '(' => {
+                tokens.push(Token::LParen);
+                i += 1;
+            }
+            ')' => {
+                tokens.push(Token::RParen);
+                i += 1;
+            }
+            '[' => {
+                tokens.push(Token::LBracket);
+                i += 1;
+            }
+            ']' => {
+                tokens.push(Token::RBracket);
+                i += 1;
+            }
+            ',' => {
+                tokens.push(Token::Comma);
+                i += 1;
+            }
+            '~' => {
+                tokens.push(Token::Op("~".into()));
+                i += 1;
+            }
             '!' if i + 1 < chars.len() && chars[i + 1] == '=' => {
-                tokens.push(Token::Op("!=".into())); i += 2;
+                tokens.push(Token::Op("!=".into()));
+                i += 2;
             }
             '<' if i + 1 < chars.len() && chars[i + 1] == '=' => {
-                tokens.push(Token::Op("<=".into())); i += 2;
+                tokens.push(Token::Op("<=".into()));
+                i += 2;
             }
             '>' if i + 1 < chars.len() && chars[i + 1] == '=' => {
-                tokens.push(Token::Op(">=".into())); i += 2;
+                tokens.push(Token::Op(">=".into()));
+                i += 2;
             }
-            '=' => { tokens.push(Token::Op("=".into())); i += 1; }
-            '<' => { tokens.push(Token::Op("<".into())); i += 1; }
-            '>' => { tokens.push(Token::Op(">".into())); i += 1; }
+            '=' => {
+                tokens.push(Token::Op("=".into()));
+                i += 1;
+            }
+            '<' => {
+                tokens.push(Token::Op("<".into()));
+                i += 1;
+            }
+            '>' => {
+                tokens.push(Token::Op(">".into()));
+                i += 1;
+            }
             c if c.is_alphanumeric() || c == '_' || c == '-' => {
                 let start = i;
-                while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '-') {
+                while i < chars.len()
+                    && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '-')
+                {
                     i += 1;
                 }
                 let word: String = chars[start..i].iter().collect();
                 tokens.push(Token::Ident(word));
             }
             other => {
-                return Err(CortxError::QueryParse(format!("unexpected character '{other}'")));
+                return Err(CortxError::QueryParse(format!(
+                    "unexpected character '{other}'"
+                )));
             }
         }
     }
@@ -163,26 +201,33 @@ fn parse_primary(tokens: &[Token], pos: &mut usize) -> Result<Expr> {
     let field = match &tokens[*pos] {
         Token::Ident(s) => s.clone(),
         other => {
-            return Err(CortxError::QueryParse(format!("expected field name, got '{other}'")));
+            return Err(CortxError::QueryParse(format!(
+                "expected field name, got '{other}'"
+            )));
         }
     };
     *pos += 1;
 
     if *pos >= tokens.len() {
-        return Err(CortxError::QueryParse(format!("unexpected end after field '{field}'")));
+        return Err(CortxError::QueryParse(format!(
+            "unexpected end after field '{field}'"
+        )));
     }
 
     // text ~ "pattern"
     if field == "text"
         && let Token::Op(op) = &tokens[*pos]
-            && op == "~" {
-                *pos += 1;
-                let pattern = parse_value(tokens, pos)?;
-                if let Value::String(s) = pattern {
-                    return Ok(Expr::TextSearch { pattern: s });
-                }
-                return Err(CortxError::QueryParse("text search pattern must be a string".into()));
-            }
+        && op == "~"
+    {
+        *pos += 1;
+        let pattern = parse_value(tokens, pos)?;
+        if let Value::String(s) = pattern {
+            return Ok(Expr::TextSearch { pattern: s });
+        }
+        return Err(CortxError::QueryParse(
+            "text search pattern must be a string".into(),
+        ));
+    }
 
     if matches!(&tokens[*pos], Token::Ident(s) if s == "contains") {
         *pos += 1;
@@ -193,17 +238,23 @@ fn parse_primary(tokens: &[Token], pos: &mut usize) -> Result<Expr> {
     if matches!(&tokens[*pos], Token::Ident(s) if s == "between") {
         *pos += 1;
         if *pos >= tokens.len() || tokens[*pos] != Token::LBracket {
-            return Err(CortxError::QueryParse("expected '[' after 'between'".into()));
+            return Err(CortxError::QueryParse(
+                "expected '[' after 'between'".into(),
+            ));
         }
         *pos += 1;
         let start = parse_value(tokens, pos)?;
         if *pos >= tokens.len() || tokens[*pos] != Token::Comma {
-            return Err(CortxError::QueryParse("expected ',' in between range".into()));
+            return Err(CortxError::QueryParse(
+                "expected ',' in between range".into(),
+            ));
         }
         *pos += 1;
         let end = parse_value(tokens, pos)?;
         if *pos >= tokens.len() || tokens[*pos] != Token::RBracket {
-            return Err(CortxError::QueryParse("expected ']' after between range".into()));
+            return Err(CortxError::QueryParse(
+                "expected ']' after between range".into(),
+            ));
         }
         *pos += 1;
         return Ok(Expr::Between { field, start, end });
@@ -224,7 +275,9 @@ fn parse_primary(tokens: &[Token], pos: &mut usize) -> Result<Expr> {
             ">" => CompareOp::Gt,
             ">=" => CompareOp::Ge,
             other => {
-                return Err(CortxError::QueryParse(format!("unexpected operator '{other}'")));
+                return Err(CortxError::QueryParse(format!(
+                    "unexpected operator '{other}'"
+                )));
             }
         };
         *pos += 1;
@@ -271,7 +324,9 @@ fn parse_value(tokens: &[Token], pos: &mut usize) -> Result<Value> {
                 other => Ok(Value::String(other.to_string())),
             }
         }
-        other => Err(CortxError::QueryParse(format!("expected value, got '{other}'"))),
+        other => Err(CortxError::QueryParse(format!(
+            "expected value, got '{other}'"
+        ))),
     }
 }
 

@@ -1,8 +1,8 @@
-use clap::Args;
 use crate::config::Config;
 use crate::error::Result;
-use crate::storage::markdown::MarkdownRepository;
 use crate::storage::Repository;
+use crate::storage::markdown::MarkdownRepository;
+use clap::Args;
 
 #[derive(Args)]
 pub struct ShowArgs {

@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
 use crate::error::{CortxError, Result};
 use crate::schema::registry::TypeRegistry;
+use std::path::{Path, PathBuf};
 
 pub struct Config {
     pub vault_path: PathBuf,

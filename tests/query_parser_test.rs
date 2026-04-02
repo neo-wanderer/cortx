@@ -117,7 +117,8 @@ fn test_parse_not() {
 
 #[test]
 fn test_parse_parentheses() {
-    let expr = parse_query(r#"type = "task" and (status = "open" or status = "in_progress")"#).unwrap();
+    let expr =
+        parse_query(r#"type = "task" and (status = "open" or status = "in_progress")"#).unwrap();
     match &expr {
         Expr::And(_, right) => {
             assert!(matches!(right.as_ref(), Expr::Or(_, _)));

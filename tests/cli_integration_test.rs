@@ -35,8 +35,16 @@ fn test_create_with_set_fields() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
         .args([
-            "create", "task", "--title", "Fix bug", "--id", "task-fix",
-            "--set", "status=in_progress", "--set", "due=2026-04-10",
+            "create",
+            "task",
+            "--title",
+            "Fix bug",
+            "--id",
+            "task-fix",
+            "--set",
+            "status=in_progress",
+            "--set",
+            "due=2026-04-10",
         ])
         .assert()
         .success();
@@ -65,7 +73,14 @@ fn test_update_entity() {
 fn test_archive_entity() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
-        .args(["create", "task", "--title", "Archive me", "--id", "task-arch"])
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Archive me",
+            "--id",
+            "task-arch",
+        ])
         .assert()
         .success();
     cortx_cmd(&vault)
@@ -94,13 +109,26 @@ fn test_delete_entity() {
 fn test_query_filters() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
-        .args(["create", "task", "--title", "Open task", "--id", "task-open"])
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Open task",
+            "--id",
+            "task-open",
+        ])
         .assert()
         .success();
     cortx_cmd(&vault)
         .args([
-            "create", "task", "--title", "Done task", "--id", "task-done",
-            "--set", "status=done",
+            "create",
+            "task",
+            "--title",
+            "Done task",
+            "--id",
+            "task-done",
+            "--set",
+            "status=done",
         ])
         .assert()
         .success();
@@ -117,8 +145,14 @@ fn test_create_person() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
         .args([
-            "create", "person", "--name", "Jane Doe",
-            "--id", "person-jane", "--tags", "founder,design",
+            "create",
+            "person",
+            "--name",
+            "Jane Doe",
+            "--id",
+            "person-jane",
+            "--tags",
+            "founder,design",
         ])
         .assert()
         .success()
@@ -131,13 +165,22 @@ fn test_query_overdue_tasks() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
         .args([
-            "create", "task", "--title", "Overdue task", "--id", "task-overdue",
-            "--set", "due=2020-01-01",
+            "create",
+            "task",
+            "--title",
+            "Overdue task",
+            "--id",
+            "task-overdue",
+            "--set",
+            "due=2020-01-01",
         ])
         .assert()
         .success();
     cortx_cmd(&vault)
-        .args(["query", r#"type = "task" and status != "done" and due < today"#])
+        .args([
+            "query",
+            r#"type = "task" and status != "done" and due < today"#,
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Overdue task"));
@@ -148,15 +191,27 @@ fn test_meta_distinct_tags() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
         .args([
-            "create", "task", "--title", "T1",
-            "--id", "task-t1", "--tags", "home,urgent",
+            "create",
+            "task",
+            "--title",
+            "T1",
+            "--id",
+            "task-t1",
+            "--tags",
+            "home,urgent",
         ])
         .assert()
         .success();
     cortx_cmd(&vault)
         .args([
-            "create", "task", "--title", "T2",
-            "--id", "task-t2", "--tags", "home,work",
+            "create",
+            "task",
+            "--title",
+            "T2",
+            "--id",
+            "task-t2",
+            "--tags",
+            "home,work",
         ])
         .assert()
         .success();
@@ -182,8 +237,14 @@ fn test_meta_count_by_status() {
         .success();
     cortx_cmd(&vault)
         .args([
-            "create", "task", "--title", "T3", "--id", "task-c3",
-            "--set", "status=done",
+            "create",
+            "task",
+            "--title",
+            "T3",
+            "--id",
+            "task-c3",
+            "--set",
+            "status=done",
         ])
         .assert()
         .success();
@@ -199,7 +260,14 @@ fn test_meta_count_by_status() {
 fn test_doctor_validate() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
-        .args(["create", "task", "--title", "Valid task", "--id", "task-valid"])
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Valid task",
+            "--id",
+            "task-valid",
+        ])
         .assert()
         .success();
     cortx_cmd(&vault)
@@ -224,9 +292,13 @@ fn test_note_headings_and_insert() {
         .stdout(predicate::str::contains("## Action Items"));
     cortx_cmd(&vault)
         .args([
-            "note", "insert-after-heading", "note-test",
-            "--heading", "## Action Items",
-            "--content", "Item 2 (added by agent)",
+            "note",
+            "insert-after-heading",
+            "note-test",
+            "--heading",
+            "## Action Items",
+            "--content",
+            "Item 2 (added by agent)",
         ])
         .assert()
         .success();

@@ -1,6 +1,6 @@
+use super::ast::{CompareOp, Expr};
 use crate::entity::Entity;
 use crate::value::Value;
-use super::ast::{CompareOp, Expr};
 
 /// Evaluate a query expression against an entity. Returns `true` if the entity matches.
 ///

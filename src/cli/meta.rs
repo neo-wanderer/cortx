@@ -1,11 +1,11 @@
-use clap::{Args, Subcommand};
 use crate::config::Config;
 use crate::error::Result;
 use crate::query::evaluator::evaluate;
 use crate::query::parser::parse_query;
-use crate::storage::markdown::MarkdownRepository;
 use crate::storage::Repository;
+use crate::storage::markdown::MarkdownRepository;
 use crate::value::Value;
+use clap::{Args, Subcommand};
 use std::collections::HashMap;
 
 #[derive(Args)]
@@ -98,7 +98,10 @@ fn apply_filter(
     match filter {
         Some(expr_str) => {
             let expr = parse_query(expr_str)?;
-            Ok(entities.into_iter().filter(|e| evaluate(&expr, e)).collect())
+            Ok(entities
+                .into_iter()
+                .filter(|e| evaluate(&expr, e))
+                .collect())
         }
         None => Ok(entities),
     }

@@ -1,9 +1,9 @@
-use clap::{Args, Subcommand};
 use crate::config::Config;
 use crate::error::Result;
 use crate::schema::validation::validate_frontmatter;
-use crate::storage::markdown::MarkdownRepository;
 use crate::storage::Repository;
+use crate::storage::markdown::MarkdownRepository;
+use clap::{Args, Subcommand};
 use regex::Regex;
 
 #[derive(Args)]
@@ -30,16 +30,20 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
 
             for entity in &all {
                 if let Some(type_def) = config.registry.get(&entity.entity_type)
-                    && let Err(e) = validate_frontmatter(&entity.frontmatter, type_def) {
-                        errors += 1;
-                        println!("ERROR in {} ({}): {e}", entity.id, entity.entity_type);
-                    }
+                    && let Err(e) = validate_frontmatter(&entity.frontmatter, type_def)
+                {
+                    errors += 1;
+                    println!("ERROR in {} ({}): {e}", entity.id, entity.entity_type);
+                }
             }
 
             if errors == 0 {
                 println!("All {} entities pass validation.", all.len());
             } else {
-                println!("\n{errors} validation error(s) found in {} entities.", all.len());
+                println!(
+                    "\n{errors} validation error(s) found in {} entities.",
+                    all.len()
+                );
             }
         }
         DoctorCommands::Links => {

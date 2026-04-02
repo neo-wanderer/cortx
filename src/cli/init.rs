@@ -1,7 +1,7 @@
-use clap::Args;
 use crate::error::Result;
-use std::path::Path;
+use clap::Args;
 use std::fs;
+use std::path::Path;
 
 #[derive(Args)]
 pub struct InitArgs {

@@ -15,19 +15,11 @@ pub enum Expr {
         end: Value,
     },
     /// field contains value (for arrays)
-    Contains {
-        field: String,
-        value: Value,
-    },
+    Contains { field: String, value: Value },
     /// field in [val1, val2, ...]
-    In {
-        field: String,
-        values: Vec<Value>,
-    },
+    In { field: String, values: Vec<Value> },
     /// text ~ "pattern" (body text search)
-    TextSearch {
-        pattern: String,
-    },
+    TextSearch { pattern: String },
     /// expr AND expr
     And(Box<Expr>, Box<Expr>),
     /// expr OR expr

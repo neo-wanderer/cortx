@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use crate::error::{CortxError, Result};
 use super::types::{FieldDefinition, FieldType, TypeDefinition};
+use crate::error::{CortxError, Result};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct TypeRegistry {
@@ -125,10 +125,7 @@ impl TypeRegistry {
                 "number" => FieldType::Number,
                 "array[string]" => FieldType::ArrayString,
                 t if t.starts_with("link") => {
-                    let ref_type = val
-                        .get("ref")
-                        .and_then(|v| v.as_str())
-                        .map(String::from);
+                    let ref_type = val.get("ref").and_then(|v| v.as_str()).map(String::from);
                     FieldType::Link { ref_type }
                 }
                 other => {

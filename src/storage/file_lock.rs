@@ -1,6 +1,6 @@
+use crate::error::{CortxError, Result};
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
-use crate::error::{CortxError, Result};
 
 #[derive(Debug)]
 pub struct FileLock {

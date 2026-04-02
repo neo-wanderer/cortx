@@ -1,6 +1,6 @@
+use crate::value::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use crate::value::Value;
 
 /// A Second Brain entity parsed from a Markdown file.
 ///

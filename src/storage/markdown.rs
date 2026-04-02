@@ -1,16 +1,16 @@
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use rayon::prelude::*;
 
+use super::Repository;
+use super::file_lock;
 use crate::entity::Entity;
 use crate::error::{CortxError, Result};
 use crate::frontmatter::{parse_frontmatter, serialize_entity};
 use crate::schema::registry::TypeRegistry;
 use crate::schema::validation::validate_frontmatter;
 use crate::value::Value;
-use super::Repository;
-use super::file_lock;
 
 pub struct MarkdownRepository {
     vault_path: PathBuf,
@@ -25,13 +25,19 @@ impl MarkdownRepository {
         let type_def = registry
             .get(type_name)
             .ok_or_else(|| CortxError::Schema(format!("unknown type '{type_name}'")))?;
-        Ok(self.vault_path.join(&type_def.folder).join(format!("{id}.md")))
+        Ok(self
+            .vault_path
+            .join(&type_def.folder)
+            .join(format!("{id}.md")))
     }
 
     fn find_file_by_id(&self, id: &str, registry: &TypeRegistry) -> Result<PathBuf> {
         for type_name in registry.type_names() {
             if let Some(type_def) = registry.get(type_name) {
-                let path = self.vault_path.join(&type_def.folder).join(format!("{id}.md"));
+                let path = self
+                    .vault_path
+                    .join(&type_def.folder)
+                    .join(format!("{id}.md"));
                 if path.exists() {
                     return Ok(path);
                 }
@@ -55,10 +61,7 @@ impl MarkdownRepository {
             .max_depth(1)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path().is_file()
-                    && e.path().extension().is_some_and(|ext| ext == "md")
-            })
+            .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "md"))
             .map(|e| e.path().to_path_buf())
             .collect();
 

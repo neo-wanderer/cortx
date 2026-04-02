@@ -1,9 +1,9 @@
-use clap::Args;
 use crate::config::Config;
 use crate::error::Result;
-use crate::storage::markdown::MarkdownRepository;
 use crate::storage::Repository;
+use crate::storage::markdown::MarkdownRepository;
 use crate::value::Value;
+use clap::Args;
 use std::collections::HashMap;
 
 #[derive(Args)]
@@ -50,10 +50,10 @@ pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
 
     if let Some(type_def) = config.registry.get(&args.entity_type)
         && type_def.fields.contains_key("status")
-            && !args.fields.iter().any(|f| f.starts_with("status="))
-        {
-            fm.insert("status".into(), Value::String("open".into()));
-        }
+        && !args.fields.iter().any(|f| f.starts_with("status="))
+    {
+        fm.insert("status".into(), Value::String("open".into()));
+    }
 
     if let Some(tags) = &args.tags {
         let tag_list: Vec<Value> = tags

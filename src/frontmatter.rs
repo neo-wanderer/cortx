@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use crate::error::{CortxError, Result};
 use crate::value::Value;
+use std::collections::HashMap;
 
 /// Parse a Markdown file's content into (frontmatter HashMap, body string).
 ///
@@ -34,7 +34,9 @@ pub fn parse_frontmatter(content: &str) -> Result<(HashMap<String, Value>, Strin
 
     let yaml_str = &after_first[..close_pos];
     let body_start = close_pos + 4;
-    let body = after_first[body_start..].trim_start_matches('\n').to_string();
+    let body = after_first[body_start..]
+        .trim_start_matches('\n')
+        .to_string();
 
     let yaml_value: serde_yaml::Value = serde_yaml::from_str(yaml_str)?;
     let mapping = yaml_value
@@ -79,14 +81,10 @@ pub fn serialize_entity(frontmatter: &HashMap<String, Value>, body: &str) -> Str
 
     for key in keys {
         let val = &frontmatter[key];
-        yaml_map.insert(
-            serde_yaml::Value::String(key.clone()),
-            val.to_yaml(),
-        );
+        yaml_map.insert(serde_yaml::Value::String(key.clone()), val.to_yaml());
     }
 
-    let yaml_str = serde_yaml::to_string(&serde_yaml::Value::Mapping(yaml_map))
-        .unwrap_or_default();
+    let yaml_str = serde_yaml::to_string(&serde_yaml::Value::Mapping(yaml_map)).unwrap_or_default();
 
     format!("---\n{yaml_str}---\n{body}")
 }

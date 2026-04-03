@@ -1462,3 +1462,114 @@ fn test_create_with_date_keywords_resolves_to_date() {
         "expected due to be resolved to {yesterday}, got:\n{content}"
     );
 }
+
+#[test]
+fn test_init_with_name_registers_in_global_config() {
+    let dir = TempDir::new().unwrap();
+    let vault_dir = TempDir::new().unwrap();
+    // Use a temp HOME so we don't pollute the real ~/.cortx/config.toml
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["init", vault_dir.path().to_str().unwrap(), "--name", "testonly"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Registered vault 'testonly'"));
+    // Config file must exist
+    assert!(dir.path().join(".cortx").join("config.toml").exists());
+    let config_content =
+        fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
+    assert!(config_content.contains("testonly"));
+}
+
+#[test]
+fn test_init_first_named_vault_becomes_default() {
+    let dir = TempDir::new().unwrap();
+    let vault_dir = TempDir::new().unwrap();
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["init", vault_dir.path().to_str().unwrap(), "--name", "myvault"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Set 'myvault' as the default vault."));
+    let config_content =
+        fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
+    assert!(config_content.contains("default = \"myvault\""));
+}
+
+#[test]
+fn test_init_duplicate_name_errors() {
+    let dir = TempDir::new().unwrap();
+    let vault1 = TempDir::new().unwrap();
+    let vault2 = TempDir::new().unwrap();
+    // First registration succeeds
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["init", vault1.path().to_str().unwrap(), "--name", "shared"])
+        .assert()
+        .success();
+    // Second registration with same name fails
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["init", vault2.path().to_str().unwrap(), "--name", "shared"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("vault name 'shared' is already registered"));
+}
+
+#[test]
+fn test_vault_name_flag_resolves_correct_vault() {
+    let home_dir = TempDir::new().unwrap();
+    let vault_dir = TempDir::new().unwrap();
+    // Init and register a named vault
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", home_dir.path())
+        .args(["init", vault_dir.path().to_str().unwrap(), "--name", "mywork"])
+        .assert()
+        .success();
+    // Create an entity using --vault-name
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", home_dir.path())
+        .args([
+            "--vault-name", "mywork",
+            "create", "task",
+            "--title", "Named vault task",
+            "--id", "task-named-vault",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Created task-named-vault"));
+    // Verify the file exists in the named vault
+    assert!(vault_dir.path().join("1_Projects/tasks/task-named-vault.md").exists());
+}
+
+#[test]
+fn test_vault_name_unknown_errors() {
+    let home_dir = TempDir::new().unwrap();
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", home_dir.path())
+        .args(["--vault-name", "ghost", "query", "type = \"task\""])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("vault 'ghost' not found in global config"));
+}
+
+#[test]
+fn test_init_without_name_skips_global_config() {
+    let dir = TempDir::new().unwrap();
+    let vault_dir = TempDir::new().unwrap();
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["init", vault_dir.path().to_str().unwrap()])
+        .assert()
+        .success();
+    // No config file should be created when --name is not provided
+    assert!(!dir.path().join(".cortx").join("config.toml").exists());
+}

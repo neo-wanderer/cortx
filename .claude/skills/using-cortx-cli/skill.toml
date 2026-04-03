@@ -1,0 +1,11 @@
+[skill]
+name = "using-cortx-cli"
+version = "0.1.0"
+description = "Manage Second Brain entities (tasks, projects, people, notes) through the cortx CLI"
+author = "vigneshjagadeesh"
+license = "MIT"
+tags = ["cortx", "second-brain", "tasks", "notes", "vault", "cli"]
+
+
+
+

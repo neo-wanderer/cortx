@@ -89,14 +89,10 @@ pub fn parse_cli_value(v: &str) -> Value {
     match v {
         "today" => return Value::Date(chrono::Local::now().date_naive()),
         "yesterday" => {
-            return Value::Date(
-                chrono::Local::now().date_naive() - chrono::Duration::days(1),
-            )
+            return Value::Date(chrono::Local::now().date_naive() - chrono::Duration::days(1));
         }
         "tomorrow" => {
-            return Value::Date(
-                chrono::Local::now().date_naive() + chrono::Duration::days(1),
-            )
+            return Value::Date(chrono::Local::now().date_naive() + chrono::Duration::days(1));
         }
         _ => {}
     }

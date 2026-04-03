@@ -80,7 +80,8 @@ mod tests {
     #[test]
     fn register_vault_adds_entry() {
         let mut cfg = GlobalConfig::default();
-        cfg.register_vault("work", PathBuf::from("/tmp/work")).unwrap();
+        cfg.register_vault("work", PathBuf::from("/tmp/work"))
+            .unwrap();
         assert!(cfg.vaults.contains_key("work"));
         assert_eq!(cfg.vaults["work"].path, PathBuf::from("/tmp/work"));
     }
@@ -88,7 +89,8 @@ mod tests {
     #[test]
     fn register_vault_duplicate_name_errors() {
         let mut cfg = GlobalConfig::default();
-        cfg.register_vault("work", PathBuf::from("/tmp/work")).unwrap();
+        cfg.register_vault("work", PathBuf::from("/tmp/work"))
+            .unwrap();
         let result = cfg.register_vault("work", PathBuf::from("/tmp/other"));
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
@@ -98,7 +100,12 @@ mod tests {
     #[test]
     fn resolve_path_returns_default_vault() {
         let mut cfg = GlobalConfig::default();
-        cfg.vaults.insert("personal".into(), VaultEntry { path: PathBuf::from("/tmp/personal") });
+        cfg.vaults.insert(
+            "personal".into(),
+            VaultEntry {
+                path: PathBuf::from("/tmp/personal"),
+            },
+        );
         cfg.default = Some("personal".into());
         assert_eq!(cfg.resolve_path(None), Some(PathBuf::from("/tmp/personal")));
     }
@@ -106,17 +113,35 @@ mod tests {
     #[test]
     fn resolve_path_by_name() {
         let mut cfg = GlobalConfig::default();
-        cfg.vaults.insert("work".into(), VaultEntry { path: PathBuf::from("/tmp/work") });
+        cfg.vaults.insert(
+            "work".into(),
+            VaultEntry {
+                path: PathBuf::from("/tmp/work"),
+            },
+        );
         cfg.default = Some("work".into());
         // named lookup ignores default
-        cfg.vaults.insert("personal".into(), VaultEntry { path: PathBuf::from("/tmp/personal") });
-        assert_eq!(cfg.resolve_path(Some("personal")), Some(PathBuf::from("/tmp/personal")));
+        cfg.vaults.insert(
+            "personal".into(),
+            VaultEntry {
+                path: PathBuf::from("/tmp/personal"),
+            },
+        );
+        assert_eq!(
+            cfg.resolve_path(Some("personal")),
+            Some(PathBuf::from("/tmp/personal"))
+        );
     }
 
     #[test]
     fn resolve_path_missing_name_returns_none() {
         let mut cfg = GlobalConfig::default();
-        cfg.vaults.insert("work".into(), VaultEntry { path: PathBuf::from("/tmp/work") });
+        cfg.vaults.insert(
+            "work".into(),
+            VaultEntry {
+                path: PathBuf::from("/tmp/work"),
+            },
+        );
         // no default set
         assert_eq!(cfg.resolve_path(None), None);
     }
@@ -131,11 +156,15 @@ mod tests {
     fn save_and_reload_roundtrip() {
         // serialize to TOML string and deserialize back
         let mut cfg = GlobalConfig::default();
-        cfg.register_vault("personal", PathBuf::from("/tmp/personal")).unwrap();
+        cfg.register_vault("personal", PathBuf::from("/tmp/personal"))
+            .unwrap();
         cfg.default = Some("personal".into());
         let serialized = toml::to_string(&cfg).unwrap();
         let reloaded: GlobalConfig = toml::from_str(&serialized).unwrap();
         assert_eq!(reloaded.default, Some("personal".into()));
-        assert_eq!(reloaded.vaults["personal"].path, PathBuf::from("/tmp/personal"));
+        assert_eq!(
+            reloaded.vaults["personal"].path,
+            PathBuf::from("/tmp/personal")
+        );
     }
 }

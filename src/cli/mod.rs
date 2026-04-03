@@ -18,9 +18,11 @@ use clap::{Parser, Subcommand};
     about = "Second Brain CLI for agents and humans"
 )]
 pub struct Cli {
+    /// Path to the vault directory (overrides all other sources)
     #[arg(long, global = true)]
     pub vault: Option<String>,
 
+    /// Name of a registered vault from ~/.cortx/config.toml
     #[arg(long, global = true)]
     pub vault_name: Option<String>,
 

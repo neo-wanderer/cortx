@@ -128,7 +128,20 @@ impl PartialOrd for Value {
             (Value::Date(a), Value::Date(b)) => a.partial_cmp(b),
             (Value::Number(a), Value::Number(b)) => a.partial_cmp(b),
             (Value::String(a), Value::String(b)) => a.partial_cmp(b),
-            _ => None,
+            (Value::Bool(a), Value::Bool(b)) => a.partial_cmp(b),
+            (Value::Array(a), Value::Array(b)) => a.partial_cmp(b),
+            // For mixed types, use type-based ordering for consistent sorting
+            // Order: Null < Bool < Number < String < Date < Array
+            (Value::Null, _) => Some(Ordering::Less),
+            (_, Value::Null) => Some(Ordering::Greater),
+            (Value::Bool(_), _) => Some(Ordering::Less),
+            (_, Value::Bool(_)) => Some(Ordering::Greater),
+            (Value::Number(_), _) => Some(Ordering::Less),
+            (_, Value::Number(_)) => Some(Ordering::Greater),
+            (Value::String(_), _) => Some(Ordering::Less),
+            (_, Value::String(_)) => Some(Ordering::Greater),
+            (Value::Date(_), _) => Some(Ordering::Less),
+            (_, Value::Date(_)) => Some(Ordering::Greater),
         }
     }
 }

@@ -878,3 +878,519 @@ fn test_init_idempotent() {
         .assert()
         .success();
 }
+
+// -- Quoted field names in queries --
+
+#[test]
+fn test_query_quoted_field_name() {
+    let vault = TestVault::new();
+    // Create entity with a field containing a space
+    vault.write_file(
+        "1_Projects/tasks/task-custom.md",
+        "---\nid: task-custom\ntype: task\ntitle: Custom Field Task\nstatus: open\nDue By: 2026-04-15\ntags: []\n---\nBody.\n",
+    );
+    cortx_cmd(&vault)
+        .args(["query", r#""Due By" = "2026-04-15""#])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Custom Field Task"));
+}
+
+// -- Sort tests --
+
+#[test]
+fn test_query_sort_single_field_asc() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Task A",
+            "--id",
+            "task-sa1",
+            "--set",
+            "due=2026-04-10",
+        ])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Task B",
+            "--id",
+            "task-sa2",
+            "--set",
+            "due=2026-04-05",
+        ])
+        .assert()
+        .success();
+    // Ascending sort: Task B (2026-04-05) should appear before Task A (2026-04-10)
+    let output = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "due"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8(output).unwrap();
+    let pos_b = output_str
+        .find("Task B")
+        .expect("Task B should be in output");
+    let pos_a = output_str
+        .find("Task A")
+        .expect("Task A should be in output");
+    assert!(
+        pos_b < pos_a,
+        "Task B should appear before Task A in ascending sort"
+    );
+}
+
+#[test]
+fn test_query_sort_single_field_desc() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Task A",
+            "--id",
+            "task-sd1",
+            "--set",
+            "due=2026-04-10",
+        ])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Task B",
+            "--id",
+            "task-sd2",
+            "--set",
+            "due=2026-04-05",
+        ])
+        .assert()
+        .success();
+    // Descending sort: Task A (2026-04-10) should appear before Task B (2026-04-05)
+    let output = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "due:desc"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8(output).unwrap();
+    let pos_a = output_str
+        .find("Task A")
+        .expect("Task A should be in output");
+    let pos_b = output_str
+        .find("Task B")
+        .expect("Task B should be in output");
+    assert!(
+        pos_a < pos_b,
+        "Task A should appear before Task B in descending sort"
+    );
+}
+
+#[test]
+fn test_query_sort_multi_field() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Task 1",
+            "--id",
+            "task-sm1",
+            "--set",
+            "status=open",
+            "--set",
+            "priority=1",
+        ])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Task 2",
+            "--id",
+            "task-sm2",
+            "--set",
+            "status=open",
+            "--set",
+            "priority=2",
+        ])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Task 3",
+            "--id",
+            "task-sm3",
+            "--set",
+            "status=done",
+            "--set",
+            "priority=1",
+        ])
+        .assert()
+        .success();
+    // Sort by status:asc, priority:desc
+    // Alphabetically: 'done' < 'open', so Task 3 comes first
+    // Within 'open': priority 2 > 1, so Task 2 before Task 1
+    // Expected order: Task 3 (done,p1), Task 2 (open,p2), Task 1 (open,p1)
+    let output = cortx_cmd(&vault)
+        .args([
+            "query",
+            r#"type = "task""#,
+            "--sort-by",
+            "status:asc,priority:desc",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8(output).unwrap();
+    let pos_2 = output_str
+        .find("Task 2")
+        .expect("Task 2 should be in output");
+    let pos_1 = output_str
+        .find("Task 1")
+        .expect("Task 1 should be in output");
+    let pos_3 = output_str
+        .find("Task 3")
+        .expect("Task 3 should be in output");
+    assert!(
+        pos_3 < pos_2,
+        "Task 3 (done) should appear before Task 2 (open)"
+    );
+    assert!(
+        pos_2 < pos_1,
+        "Task 2 (priority 2) should appear before Task 1 (priority 1)"
+    );
+}
+
+#[test]
+fn test_query_sort_nulls_to_end() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "No Due", "--id", "task-sn1"])
+        .assert()
+        .success(); // no due date
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Has Due",
+            "--id",
+            "task-sn2",
+            "--set",
+            "due=2026-04-05",
+        ])
+        .assert()
+        .success();
+    // Ascending sort: Has Due should appear before No Due
+    let output = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "due"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8(output).unwrap();
+    let pos_has = output_str
+        .find("Has Due")
+        .expect("Has Due should be in output");
+    let pos_no = output_str
+        .find("No Due")
+        .expect("No Due should be in output");
+    assert!(
+        pos_has < pos_no,
+        "Has Due should appear before No Due in ascending sort"
+    );
+
+    // Descending sort: nulls should still be at end
+    let output_desc = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "due:desc"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_desc_str = String::from_utf8(output_desc).unwrap();
+    let pos_has_desc = output_desc_str
+        .find("Has Due")
+        .expect("Has Due should be in output");
+    let pos_no_desc = output_desc_str
+        .find("No Due")
+        .expect("No Due should be in output");
+    assert!(
+        pos_has_desc < pos_no_desc,
+        "Has Due should appear before No Due in descending sort"
+    );
+}
+
+#[test]
+fn test_query_sort_empty_field_rejected() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Test", "--id", "task-sf1"])
+        .assert()
+        .success();
+    // Empty sort specification
+    cortx_cmd(&vault)
+        .args(["query", "type = \"task\"", "--sort-by", ""])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("empty sort specification"));
+    // Empty field name (just order without field)
+    cortx_cmd(&vault)
+        .args(["query", "type = \"task\"", "--sort-by", ":asc"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("empty field name"));
+}
+
+#[test]
+fn test_query_sort_number_values() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Priority 2",
+            "--id",
+            "task-p2",
+            "--set",
+            "priority=2",
+        ])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Priority 1",
+            "--id",
+            "task-p1",
+            "--set",
+            "priority=1",
+        ])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Priority 3",
+            "--id",
+            "task-p3",
+            "--set",
+            "priority=3",
+        ])
+        .assert()
+        .success();
+    // Ascending sort by number should show 1, 2, 3
+    let output = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "priority"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8(output).unwrap();
+    let pos_p1 = output_str
+        .find("Priority 1")
+        .expect("Priority 1 should be in output");
+    let pos_p2 = output_str
+        .find("Priority 2")
+        .expect("Priority 2 should be in output");
+    let pos_p3 = output_str
+        .find("Priority 3")
+        .expect("Priority 3 should be in output");
+    assert!(
+        pos_p1 < pos_p2,
+        "Priority 1 should appear before Priority 2"
+    );
+    assert!(
+        pos_p2 < pos_p3,
+        "Priority 2 should appear before Priority 3"
+    );
+
+    // Descending sort should show 3, 2, 1
+    let output_desc = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "priority:desc"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_desc_str = String::from_utf8(output_desc).unwrap();
+    let pos_p1_desc = output_desc_str
+        .find("Priority 1")
+        .expect("Priority 1 should be in output");
+    let pos_p2_desc = output_desc_str
+        .find("Priority 2")
+        .expect("Priority 2 should be in output");
+    let pos_p3_desc = output_desc_str
+        .find("Priority 3")
+        .expect("Priority 3 should be in output");
+    assert!(
+        pos_p3_desc < pos_p2_desc,
+        "Priority 3 should appear before Priority 2 in desc"
+    );
+    assert!(
+        pos_p2_desc < pos_p1_desc,
+        "Priority 2 should appear before Priority 1 in desc"
+    );
+}
+
+#[test]
+fn test_query_sort_multiple_nulls() {
+    let vault = TestVault::new();
+    // Create multiple entities with null values
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Null 1", "--id", "task-n1"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Null 2", "--id", "task-n2"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Has Value",
+            "--id",
+            "task-hv",
+            "--set",
+            "due=2026-04-05",
+        ])
+        .assert()
+        .success();
+    // Sort by due - Has Value should be first, both nulls at end
+    let output = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "due"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8(output).unwrap();
+    let pos_hv = output_str
+        .find("Has Value")
+        .expect("Has Value should be in output");
+    let pos_n1 = output_str
+        .find("Null 1")
+        .expect("Null 1 should be in output");
+    let pos_n2 = output_str
+        .find("Null 2")
+        .expect("Null 2 should be in output");
+    assert!(pos_hv < pos_n1, "Has Value should appear before nulls");
+    assert!(pos_hv < pos_n2, "Has Value should appear before nulls");
+}
+
+#[test]
+fn test_query_sort_string_values() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Charlie",
+            "--id",
+            "task-charlie",
+            "--set",
+            "status=open",
+        ])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Alice",
+            "--id",
+            "task-alice",
+            "--set",
+            "status=open",
+        ])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Bob",
+            "--id",
+            "task-bob",
+            "--set",
+            "status=open",
+        ])
+        .assert()
+        .success();
+    // Ascending sort by title: Alice, Bob, Charlie
+    let output = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "title"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8(output).unwrap();
+    let pos_alice = output_str.find("Alice").expect("Alice should be in output");
+    let pos_bob = output_str.find("Bob").expect("Bob should be in output");
+    let pos_charlie = output_str
+        .find("Charlie")
+        .expect("Charlie should be in output");
+    assert!(pos_alice < pos_bob, "Alice should appear before Bob");
+    assert!(pos_bob < pos_charlie, "Bob should appear before Charlie");
+
+    // Descending sort by title: Charlie, Bob, Alice
+    let output_desc = cortx_cmd(&vault)
+        .args(["query", r#"type = "task""#, "--sort-by", "title:desc"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_desc_str = String::from_utf8(output_desc).unwrap();
+    let pos_alice_desc = output_desc_str
+        .find("Alice")
+        .expect("Alice should be in output");
+    let pos_bob_desc = output_desc_str
+        .find("Bob")
+        .expect("Bob should be in output");
+    let pos_charlie_desc = output_desc_str
+        .find("Charlie")
+        .expect("Charlie should be in output");
+    assert!(
+        pos_charlie_desc < pos_bob_desc,
+        "Charlie should appear before Bob in desc"
+    );
+    assert!(
+        pos_bob_desc < pos_alice_desc,
+        "Bob should appear before Alice in desc"
+    );
+}

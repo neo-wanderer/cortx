@@ -45,7 +45,7 @@ cortx show <id>                                      # Display entity
 cortx update <id> --set k=v                          # Update fields
 cortx archive <id>                                   # Soft delete (status=archived)
 cortx delete <id> --force                            # Hard delete
-cortx query '<expression>'                           # Filter entities
+cortx query '<expression>' [--sort-by <spec>]        # Filter and optionally sort entities
 cortx meta distinct <field> [--where '<expr>']        # Distinct field values
 cortx meta count-by <field> [--where '<expr>']        # Group counts
 cortx note headings <id>                             # List headings
@@ -69,6 +69,36 @@ cortx query 'type = "task" and due between ["2026-04-01", "2026-04-30"]'
 cortx query 'type = "task" and status in ["open", "in_progress"]'
 cortx query 'type = "note" and text ~ "protein"'
 ```
+
+## Sorting
+
+The `query` command supports sorting results with `--sort-by`:
+
+```
+# Basic syntax: field[:order][,field[:order]...]
+# Order defaults to 'asc' if not specified
+
+# Single field, ascending (default)
+cortx query 'type = "task"' --sort-by due
+
+# Single field, descending
+cortx query 'type = "task"' --sort-by priority:desc
+
+# Multiple fields (prioritize first, then by due date)
+cortx query 'type = "task"' --sort-by priority:desc,due:asc
+
+# Quoted field names for spaces
+cortx query 'type = "task"' --sort-by '"Due By":asc'
+
+# Complex example: high priority first, then by status, then by due date
+cortx query 'status != "done"' --sort-by priority:desc,status,due:asc
+```
+
+**Sort order**: `asc` (ascending) or `desc` (descending). Case-insensitive.
+
+**Null handling**: Fields with missing/null values always sort to the end, regardless of ascending or descending order. This ensures consistent results when entities lack optional fields.
+
+**Field types**: Sorting works for any comparable field type (dates, strings, numbers). Values are compared using their natural ordering.
 
 ## Non-Obvious Patterns
 
@@ -108,6 +138,7 @@ When changing any of the following, update the `using-cortx-cli` skill at `~/.cl
 
 - CLI commands (adding, removing, renaming commands or flags)
 - Query language operators or syntax
+- Sort syntax and behavior
 - Entity types or fields in `types.yaml`
 - Vault structure or folder conventions
 - ID generation format

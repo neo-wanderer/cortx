@@ -198,8 +198,10 @@ fn parse_primary(tokens: &[Token], pos: &mut usize) -> Result<Expr> {
         return Ok(expr);
     }
 
+    // Accept both identifiers and quoted strings as field names
     let field = match &tokens[*pos] {
         Token::Ident(s) => s.clone(),
+        Token::StringLit(s) => s.clone(), // Support quoted field names with spaces
         other => {
             return Err(CortxError::QueryParse(format!(
                 "expected field name, got '{other}'"

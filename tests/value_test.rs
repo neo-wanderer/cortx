@@ -55,10 +55,30 @@ fn test_value_compare_strings() {
 }
 
 #[test]
-fn test_value_compare_mixed_types_returns_none() {
+fn test_value_compare_bools() {
+    assert!(Value::Bool(false) < Value::Bool(true));
+    assert!(Value::Bool(true) > Value::Bool(false));
+    assert_eq!(Value::Bool(false), Value::Bool(false));
+}
+
+#[test]
+fn test_value_compare_arrays() {
+    let a = Value::Array(vec![Value::Number(1.0), Value::Number(2.0)]);
+    let b = Value::Array(vec![Value::Number(1.0), Value::Number(3.0)]);
+    assert!(a < b);
+}
+
+#[test]
+fn test_value_compare_mixed_types_consistent_ordering() {
+    // Mixed types should have a consistent ordering for stable sorting
+    // Order: Null < Bool < Number < String < Date < Array
+    assert!(Value::Null < Value::Bool(false));
+    assert!(Value::Bool(false) < Value::Number(1.0));
+    assert!(Value::Number(1.0) < Value::String("hello".into()));
     let d = Value::Date(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
-    let s = Value::String("hello".into());
-    assert_eq!(d.partial_cmp(&s), None);
+    assert!(Value::String("hello".into()) < d);
+    let arr = Value::Array(vec![]);
+    assert!(d < arr);
 }
 
 // -- from_yaml edge cases --

@@ -1471,14 +1471,18 @@ fn test_init_with_name_registers_in_global_config() {
     Command::cargo_bin("cortx")
         .unwrap()
         .env("HOME", dir.path())
-        .args(["init", vault_dir.path().to_str().unwrap(), "--name", "testonly"])
+        .args([
+            "init",
+            vault_dir.path().to_str().unwrap(),
+            "--name",
+            "testonly",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Registered vault 'testonly'"));
     // Config file must exist
     assert!(dir.path().join(".cortx").join("config.toml").exists());
-    let config_content =
-        fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
+    let config_content = fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
     assert!(config_content.contains("[vaults.testonly]"));
 }
 
@@ -1489,12 +1493,18 @@ fn test_init_first_named_vault_becomes_default() {
     Command::cargo_bin("cortx")
         .unwrap()
         .env("HOME", dir.path())
-        .args(["init", vault_dir.path().to_str().unwrap(), "--name", "myvault"])
+        .args([
+            "init",
+            vault_dir.path().to_str().unwrap(),
+            "--name",
+            "myvault",
+        ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Set 'myvault' as the default vault."));
-    let config_content =
-        fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
+        .stdout(predicate::str::contains(
+            "Set 'myvault' as the default vault.",
+        ));
+    let config_content = fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
     assert!(config_content.contains("default = \"myvault\""));
 }
 
@@ -1517,7 +1527,9 @@ fn test_init_duplicate_name_errors() {
         .args(["init", vault2.path().to_str().unwrap(), "--name", "shared"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("vault name 'shared' is already registered"));
+        .stderr(predicate::str::contains(
+            "vault name 'shared' is already registered",
+        ));
 }
 
 #[test]
@@ -1528,7 +1540,12 @@ fn test_vault_name_flag_resolves_correct_vault() {
     Command::cargo_bin("cortx")
         .unwrap()
         .env("HOME", home_dir.path())
-        .args(["init", vault_dir.path().to_str().unwrap(), "--name", "mywork"])
+        .args([
+            "init",
+            vault_dir.path().to_str().unwrap(),
+            "--name",
+            "mywork",
+        ])
         .assert()
         .success();
     // Create an entity using --vault-name
@@ -1536,16 +1553,25 @@ fn test_vault_name_flag_resolves_correct_vault() {
         .unwrap()
         .env("HOME", home_dir.path())
         .args([
-            "--vault-name", "mywork",
-            "create", "task",
-            "--title", "Named vault task",
-            "--id", "task-named-vault",
+            "--vault-name",
+            "mywork",
+            "create",
+            "task",
+            "--title",
+            "Named vault task",
+            "--id",
+            "task-named-vault",
         ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Created task-named-vault"));
     // Verify the file exists in the named vault
-    assert!(vault_dir.path().join("1_Projects/tasks/task-named-vault.md").exists());
+    assert!(
+        vault_dir
+            .path()
+            .join("1_Projects/tasks/task-named-vault.md")
+            .exists()
+    );
 }
 
 #[test]
@@ -1557,7 +1583,9 @@ fn test_vault_name_unknown_errors() {
         .args(["--vault-name", "ghost", "query", "type = \"task\""])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("vault 'ghost' not found in global config"));
+        .stderr(predicate::str::contains(
+            "vault 'ghost' not found in global config",
+        ));
 }
 
 #[test]

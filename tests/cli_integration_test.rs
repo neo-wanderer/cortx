@@ -339,7 +339,7 @@ fn test_init_does_not_overwrite_existing_types_yaml() {
         .unwrap()
         .args(["init", vault_path.to_str().unwrap()])
         .assert()
-        .success();
+        .failure();
 
     let content = fs::read_to_string(vault_path.join("types.yaml")).unwrap();
     assert_eq!(content, "custom: true");
@@ -860,23 +860,24 @@ fn test_archive_nonexistent_entity() {
         .failure();
 }
 
-// -- Init error (init on a read-only parent is hard to test, but we can test idempotent init) --
+// -- Init error (duplicate init guard) --
 
 #[test]
 fn test_init_idempotent() {
     let tmp = TempDir::new().unwrap();
     let vault_path = tmp.path().join("idempotent_vault");
-    // Run init twice - should succeed both times
+    // Run init once - should succeed
     Command::cargo_bin("cortx")
         .unwrap()
         .args(["init", vault_path.to_str().unwrap()])
         .assert()
         .success();
+    // Run init again - should fail with "already initialized" error
     Command::cargo_bin("cortx")
         .unwrap()
         .args(["init", vault_path.to_str().unwrap()])
         .assert()
-        .success();
+        .failure();
 }
 
 // -- Quoted field names in queries --
@@ -1392,5 +1393,70 @@ fn test_query_sort_string_values() {
     assert!(
         pos_bob_desc < pos_alice_desc,
         "Bob should appear before Alice in desc"
+    );
+}
+
+#[test]
+fn test_create_with_date_keywords_resolves_to_date() {
+    let vault = TestVault::new();
+    let today = chrono::Local::now().date_naive();
+    let tomorrow = today + chrono::Duration::days(1);
+    let yesterday = today - chrono::Duration::days(1);
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Tomorrow task",
+            "--id",
+            "task-tomorrow",
+            "--set",
+            "due=tomorrow",
+        ])
+        .assert()
+        .success();
+    let content = vault.read_file("1_Projects/tasks/task-tomorrow.md");
+    assert!(
+        content.contains(&format!("due: {}", tomorrow)),
+        "expected due to be resolved to {tomorrow}, got:\n{content}"
+    );
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Today task",
+            "--id",
+            "task-today",
+            "--set",
+            "due=today",
+        ])
+        .assert()
+        .success();
+    let content = vault.read_file("1_Projects/tasks/task-today.md");
+    assert!(
+        content.contains(&format!("due: {}", today)),
+        "expected due to be resolved to {today}, got:\n{content}"
+    );
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Yesterday task",
+            "--id",
+            "task-yesterday",
+            "--set",
+            "due=yesterday",
+        ])
+        .assert()
+        .success();
+    let content = vault.read_file("1_Projects/tasks/task-yesterday.md");
+    assert!(
+        content.contains(&format!("due: {}", yesterday)),
+        "expected due to be resolved to {yesterday}, got:\n{content}"
     );
 }

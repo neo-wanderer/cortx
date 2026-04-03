@@ -20,6 +20,7 @@ rayon = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 regex = "1"
+toml = { version = "0.8", features = ["parse"] }
 
 [dev-dependencies]
 tempfile = "3"

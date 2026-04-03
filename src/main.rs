@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod config;
+pub mod global_config;
 pub mod entity;
 pub mod error;
 pub mod frontmatter;

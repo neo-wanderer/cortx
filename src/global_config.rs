@@ -67,11 +67,6 @@ impl GlobalConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
-
-    fn config_in(dir: &TempDir) -> GlobalConfig {
-        GlobalConfig::default()
-    }
 
     #[test]
     fn load_missing_file_returns_empty() {

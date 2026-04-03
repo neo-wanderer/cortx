@@ -1479,7 +1479,7 @@ fn test_init_with_name_registers_in_global_config() {
     assert!(dir.path().join(".cortx").join("config.toml").exists());
     let config_content =
         fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
-    assert!(config_content.contains("testonly"));
+    assert!(config_content.contains("[vaults.testonly]"));
 }
 
 #[test]

@@ -3,6 +3,7 @@ pub mod config;
 pub mod entity;
 pub mod error;
 pub mod frontmatter;
+pub mod global_config;
 pub mod query;
 pub mod schema;
 pub mod storage;

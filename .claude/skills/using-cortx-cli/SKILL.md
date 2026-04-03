@@ -11,11 +11,20 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 
 ## Mental Model
 
-**Vault:** A directory with entity files in type-specific folders (e.g., `1_Projects/tasks/`, `5_People/`). Folder mapping comes from `types.yaml`. Set via `--vault <path>`, `CORTX_VAULT` env var, or defaults to current dir.
+**Vault:** A directory with entity files in type-specific folders (e.g., `1_Projects/tasks/`, `5_People/`). Folder mapping comes from `types.yaml`.
+
+**Vault resolution order (highest to lowest priority):**
+1. `--vault <path>` — explicit path
+2. `--vault-name <name>` — named vault from `~/.cortx/config.toml`
+3. `CORTX_VAULT` env var
+4. Default vault from `~/.cortx/config.toml` (if set)
+5. Current working directory
 
 **Entity:** A Markdown file with YAML frontmatter (typed fields: `id`, `type`, `status`, `tags`, etc.) and a freeform body. The `type` field links the file to its schema.
 
 **Links:** Entities reference each other via `link` fields (e.g., a task's `project` field holds a project ID). Soft references, not filesystem paths.
+
+**Multi-vault config:** Named vaults are stored in `~/.cortx/config.toml`. Register a vault with `cortx init <path> --name <name>`. Select it with `--vault-name <name>`. The first registered vault becomes the default automatically.
 
 **ID format:** Auto-generated as `<type>-<YYYYMMDD>-<8char-uuid>` if `--id` is omitted on create.
 
@@ -52,7 +61,7 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 
 | Command | Purpose |
 |---------|---------|
-| `cortx init [path]` | Bootstrap vault |
+| `cortx init [path] [--name <name>]` | Bootstrap vault and optionally register it |
 | `cortx doctor validate` | Validate against schemas |
 | `cortx doctor links` | Check broken wiki links |
 

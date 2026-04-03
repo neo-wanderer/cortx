@@ -1,4 +1,5 @@
 use crate::error::{CortxError, Result};
+use crate::global_config::GlobalConfig;
 use crate::schema::registry::TypeRegistry;
 use std::path::{Path, PathBuf};
 
@@ -8,12 +9,24 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(vault_path: Option<&str>) -> Result<Self> {
+    pub fn load(vault_path: Option<&str>, vault_name: Option<&str>) -> Result<Self> {
         let vault_path = if let Some(p) = vault_path {
+            // 1. Explicit --vault path
             PathBuf::from(p)
+        } else if let Some(name) = vault_name {
+            // 2. --vault-name: named lookup in global config
+            let global = GlobalConfig::load()?;
+            global.resolve_path(Some(name)).ok_or_else(|| {
+                CortxError::Storage(format!("vault '{name}' not found in global config"))
+            })?
         } else if let Ok(p) = std::env::var("CORTX_VAULT") {
+            // 3. CORTX_VAULT env var
             PathBuf::from(p)
+        } else if let Some(p) = GlobalConfig::load()?.resolve_path(None) {
+            // 4. Default vault from global config
+            p
         } else {
+            // 5. Current working directory
             std::env::current_dir()?
         };
 

@@ -3,6 +3,7 @@ pub mod config;
 pub mod entity;
 pub mod error;
 pub mod frontmatter;
+pub mod global_config;
 pub mod query;
 pub mod schema;
 pub mod storage;
@@ -24,7 +25,7 @@ fn main() {
         return;
     }
 
-    let config = match Config::load(cli.vault.as_deref()) {
+    let config = match Config::load(cli.vault.as_deref(), cli.vault_name.as_deref()) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Error loading config: {e}");

@@ -86,6 +86,16 @@ pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
 }
 
 pub fn parse_cli_value(v: &str) -> Value {
+    match v {
+        "today" => return Value::Date(chrono::Local::now().date_naive()),
+        "yesterday" => {
+            return Value::Date(chrono::Local::now().date_naive() - chrono::Duration::days(1));
+        }
+        "tomorrow" => {
+            return Value::Date(chrono::Local::now().date_naive() + chrono::Duration::days(1));
+        }
+        _ => {}
+    }
     if let Some(date_val) = Value::parse_as_date(v) {
         return date_val;
     }

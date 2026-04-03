@@ -329,7 +329,7 @@ fn test_init_creates_vault_structure() {
 }
 
 #[test]
-fn test_init_does_not_overwrite_existing_types_yaml() {
+fn test_init_fails_if_types_yaml_exists() {
     let tmp = TempDir::new().unwrap();
     let vault_path = tmp.path().join("vault2");
     fs::create_dir_all(&vault_path).unwrap();
@@ -339,7 +339,8 @@ fn test_init_does_not_overwrite_existing_types_yaml() {
         .unwrap()
         .args(["init", vault_path.to_str().unwrap()])
         .assert()
-        .success();
+        .failure()
+        .stderr(predicate::str::contains("vault already initialized at"));
 
     let content = fs::read_to_string(vault_path.join("types.yaml")).unwrap();
     assert_eq!(content, "custom: true");
@@ -860,23 +861,25 @@ fn test_archive_nonexistent_entity() {
         .failure();
 }
 
-// -- Init error (init on a read-only parent is hard to test, but we can test idempotent init) --
+// -- Init error (duplicate init guard) --
 
 #[test]
-fn test_init_idempotent() {
+fn test_init_duplicate_guard() {
     let tmp = TempDir::new().unwrap();
     let vault_path = tmp.path().join("idempotent_vault");
-    // Run init twice - should succeed both times
+    // Run init once - should succeed
     Command::cargo_bin("cortx")
         .unwrap()
         .args(["init", vault_path.to_str().unwrap()])
         .assert()
         .success();
+    // Run init again - should fail with "already initialized" error
     Command::cargo_bin("cortx")
         .unwrap()
         .args(["init", vault_path.to_str().unwrap()])
         .assert()
-        .success();
+        .failure()
+        .stderr(predicate::str::contains("vault already initialized at"));
 }
 
 // -- Quoted field names in queries --
@@ -1393,4 +1396,208 @@ fn test_query_sort_string_values() {
         pos_bob_desc < pos_alice_desc,
         "Bob should appear before Alice in desc"
     );
+}
+
+#[test]
+fn test_create_with_date_keywords_resolves_to_date() {
+    let vault = TestVault::new();
+    let today = chrono::Local::now().date_naive();
+    let tomorrow = today + chrono::Duration::days(1);
+    let yesterday = today - chrono::Duration::days(1);
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Tomorrow task",
+            "--id",
+            "task-tomorrow",
+            "--set",
+            "due=tomorrow",
+        ])
+        .assert()
+        .success();
+    let content = vault.read_file("1_Projects/tasks/task-tomorrow.md");
+    assert!(
+        content.contains(&format!("due: {}", tomorrow)),
+        "expected due to be resolved to {tomorrow}, got:\n{content}"
+    );
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Today task",
+            "--id",
+            "task-today",
+            "--set",
+            "due=today",
+        ])
+        .assert()
+        .success();
+    let content = vault.read_file("1_Projects/tasks/task-today.md");
+    assert!(
+        content.contains(&format!("due: {}", today)),
+        "expected due to be resolved to {today}, got:\n{content}"
+    );
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Yesterday task",
+            "--id",
+            "task-yesterday",
+            "--set",
+            "due=yesterday",
+        ])
+        .assert()
+        .success();
+    let content = vault.read_file("1_Projects/tasks/task-yesterday.md");
+    assert!(
+        content.contains(&format!("due: {}", yesterday)),
+        "expected due to be resolved to {yesterday}, got:\n{content}"
+    );
+}
+
+#[test]
+fn test_init_with_name_registers_in_global_config() {
+    let dir = TempDir::new().unwrap();
+    let vault_dir = TempDir::new().unwrap();
+    // Use a temp HOME so we don't pollute the real ~/.cortx/config.toml
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args([
+            "init",
+            vault_dir.path().to_str().unwrap(),
+            "--name",
+            "testonly",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Registered vault 'testonly'"));
+    // Config file must exist
+    assert!(dir.path().join(".cortx").join("config.toml").exists());
+    let config_content = fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
+    assert!(config_content.contains("[vaults.testonly]"));
+}
+
+#[test]
+fn test_init_first_named_vault_becomes_default() {
+    let dir = TempDir::new().unwrap();
+    let vault_dir = TempDir::new().unwrap();
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args([
+            "init",
+            vault_dir.path().to_str().unwrap(),
+            "--name",
+            "myvault",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Set 'myvault' as the default vault.",
+        ));
+    let config_content = fs::read_to_string(dir.path().join(".cortx").join("config.toml")).unwrap();
+    assert!(config_content.contains("default = \"myvault\""));
+}
+
+#[test]
+fn test_init_duplicate_name_errors() {
+    let dir = TempDir::new().unwrap();
+    let vault1 = TempDir::new().unwrap();
+    let vault2 = TempDir::new().unwrap();
+    // First registration succeeds
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["init", vault1.path().to_str().unwrap(), "--name", "shared"])
+        .assert()
+        .success();
+    // Second registration with same name fails
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["init", vault2.path().to_str().unwrap(), "--name", "shared"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "vault name 'shared' is already registered",
+        ));
+}
+
+#[test]
+fn test_vault_name_flag_resolves_correct_vault() {
+    let home_dir = TempDir::new().unwrap();
+    let vault_dir = TempDir::new().unwrap();
+    // Init and register a named vault
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", home_dir.path())
+        .args([
+            "init",
+            vault_dir.path().to_str().unwrap(),
+            "--name",
+            "mywork",
+        ])
+        .assert()
+        .success();
+    // Create an entity using --vault-name
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", home_dir.path())
+        .args([
+            "--vault-name",
+            "mywork",
+            "create",
+            "task",
+            "--title",
+            "Named vault task",
+            "--id",
+            "task-named-vault",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Created task-named-vault"));
+    // Verify the file exists in the named vault
+    assert!(
+        vault_dir
+            .path()
+            .join("1_Projects/tasks/task-named-vault.md")
+            .exists()
+    );
+}
+
+#[test]
+fn test_vault_name_unknown_errors() {
+    let home_dir = TempDir::new().unwrap();
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", home_dir.path())
+        .args(["--vault-name", "ghost", "query", "type = \"task\""])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "vault 'ghost' not found in global config",
+        ));
+}
+
+#[test]
+fn test_init_without_name_skips_global_config() {
+    let dir = TempDir::new().unwrap();
+    let vault_dir = TempDir::new().unwrap();
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .env("HOME", dir.path())
+        .args(["init", vault_dir.path().to_str().unwrap()])
+        .assert()
+        .success();
+    // No config file should be created when --name is not provided
+    assert!(!dir.path().join(".cortx").join("config.toml").exists());
 }

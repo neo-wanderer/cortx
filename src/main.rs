@@ -25,7 +25,7 @@ fn main() {
         return;
     }
 
-    let config = match Config::load(cli.vault.as_deref()) {
+    let config = match Config::load(cli.vault.as_deref(), cli.vault_name.as_deref()) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Error loading config: {e}");

@@ -21,6 +21,9 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub vault: Option<String>,
 
+    #[arg(long, global = true)]
+    pub vault_name: Option<String>,
+
     #[command(subcommand)]
     pub command: Commands,
 }

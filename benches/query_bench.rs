@@ -1,9 +1,11 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
+use cortx::entity::Entity;
 use cortx::frontmatter::serialize_entity;
 use cortx::query::evaluator::evaluate;
 use cortx::query::parser::parse_query;
@@ -11,6 +13,39 @@ use cortx::schema::registry::TypeRegistry;
 use cortx::storage::Repository;
 use cortx::storage::markdown::MarkdownRepository;
 use cortx::value::Value;
+
+/// Sort specification for benchmarking
+#[derive(Debug, Clone)]
+struct SortSpec {
+    field: String,
+    descending: bool,
+}
+
+/// Compare two optional values for sorting (nulls to end)
+fn compare_values(a: Option<&Value>, b: Option<&Value>, descending: bool) -> Ordering {
+    match (a, b) {
+        (Some(av), Some(bv)) => {
+            let cmp = av.partial_cmp(bv).unwrap_or(Ordering::Equal);
+            if descending { cmp.reverse() } else { cmp }
+        }
+        (None, None) => Ordering::Equal,
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+    }
+}
+
+/// Sort entities by the given specifications
+fn sort_entities(entities: &mut [&Entity], specs: &[SortSpec]) {
+    entities.sort_by(|a, b| {
+        for spec in specs {
+            let cmp = compare_values(a.get(&spec.field), b.get(&spec.field), spec.descending);
+            if cmp != Ordering::Equal {
+                return cmp;
+            }
+        }
+        Ordering::Equal
+    });
+}
 
 fn generate_vault(dir: &Path, n: usize) {
     let task_folder = dir.join("1_Projects/tasks");
@@ -135,6 +170,69 @@ fn bench_query_scan(c: &mut Criterion) {
                 }
                 assert!(!unique.is_empty());
             });
+        });
+
+        // Sort benchmarks
+        let all = repo.list_all(&registry).unwrap();
+        let task_expr = parse_query(r#"type = "task""#).unwrap();
+        let matches: Vec<_> = all.iter().filter(|e| evaluate(&task_expr, e)).collect();
+        let baseline_len = matches.len();
+
+        group.bench_with_input(BenchmarkId::new("sort_single_asc", size), &size, |b, _| {
+            b.iter_with_setup(
+                || matches.clone(),
+                |mut entities| {
+                    sort_entities(
+                        &mut entities,
+                        &[SortSpec {
+                            field: "due".into(),
+                            descending: false,
+                        }],
+                    );
+                    assert_eq!(entities.len(), baseline_len);
+                    entities
+                },
+            );
+        });
+
+        group.bench_with_input(BenchmarkId::new("sort_single_desc", size), &size, |b, _| {
+            b.iter_with_setup(
+                || matches.clone(),
+                |mut entities| {
+                    sort_entities(
+                        &mut entities,
+                        &[SortSpec {
+                            field: "due".into(),
+                            descending: true,
+                        }],
+                    );
+                    assert_eq!(entities.len(), baseline_len);
+                    entities
+                },
+            );
+        });
+
+        group.bench_with_input(BenchmarkId::new("sort_multi_field", size), &size, |b, _| {
+            b.iter_with_setup(
+                || matches.clone(),
+                |mut entities| {
+                    sort_entities(
+                        &mut entities,
+                        &[
+                            SortSpec {
+                                field: "status".into(),
+                                descending: false,
+                            },
+                            SortSpec {
+                                field: "due".into(),
+                                descending: true,
+                            },
+                        ],
+                    );
+                    assert_eq!(entities.len(), baseline_len);
+                    entities
+                },
+            );
         });
     }
 

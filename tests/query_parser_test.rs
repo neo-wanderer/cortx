@@ -41,9 +41,10 @@ fn test_parse_missing_closing_paren() {
 }
 
 #[test]
-fn test_parse_expected_field_name_got_other() {
-    let err = parse_query(r#""value" = "open""#).unwrap_err();
-    assert!(err.to_string().contains("expected field name"));
+fn test_parse_quoted_field_name() {
+    // Quoted field names are now valid (for fields with spaces)
+    let expr = parse_query(r#""Due By" = "2026-04-15""#).unwrap();
+    assert!(matches!(expr, Expr::Compare { field, .. } if field == "Due By"));
 }
 
 #[test]

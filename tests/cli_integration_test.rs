@@ -329,7 +329,7 @@ fn test_init_creates_vault_structure() {
 }
 
 #[test]
-fn test_init_does_not_overwrite_existing_types_yaml() {
+fn test_init_fails_if_types_yaml_exists() {
     let tmp = TempDir::new().unwrap();
     let vault_path = tmp.path().join("vault2");
     fs::create_dir_all(&vault_path).unwrap();
@@ -339,7 +339,8 @@ fn test_init_does_not_overwrite_existing_types_yaml() {
         .unwrap()
         .args(["init", vault_path.to_str().unwrap()])
         .assert()
-        .failure();
+        .failure()
+        .stderr(predicate::str::contains("vault already initialized at"));
 
     let content = fs::read_to_string(vault_path.join("types.yaml")).unwrap();
     assert_eq!(content, "custom: true");
@@ -863,7 +864,7 @@ fn test_archive_nonexistent_entity() {
 // -- Init error (duplicate init guard) --
 
 #[test]
-fn test_init_idempotent() {
+fn test_init_duplicate_guard() {
     let tmp = TempDir::new().unwrap();
     let vault_path = tmp.path().join("idempotent_vault");
     // Run init once - should succeed
@@ -877,7 +878,8 @@ fn test_init_idempotent() {
         .unwrap()
         .args(["init", vault_path.to_str().unwrap()])
         .assert()
-        .failure();
+        .failure()
+        .stderr(predicate::str::contains("vault already initialized at"));
 }
 
 // -- Quoted field names in queries --

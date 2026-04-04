@@ -1910,3 +1910,43 @@ fn test_schema_validate_detects_missing_inverse_field() {
         .failure()
         .stdout(predicate::str::contains("tasks"));
 }
+
+#[test]
+fn test_schema_validate_warns_inverse_one_on_array_link() {
+    let vault = TestVault::new();
+    // inverse_one: true on an array[link] field should produce a WARN but exit 0
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks:
+        type: "array[link]"
+        ref: task
+        bidirectional: true
+        inverse: goal
+        inverse_one: true
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+"#,
+    );
+    let mut cmd = Command::cargo_bin("cortx").unwrap();
+    cmd.arg("--vault").arg(vault.path().to_str().unwrap());
+    cmd.args(["schema", "validate"])
+        .assert()
+        .success() // warnings do not cause non-zero exit
+        .stdout(predicate::str::contains("WARN"));
+}

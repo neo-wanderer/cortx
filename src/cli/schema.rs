@@ -79,7 +79,7 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
                 let type_count = config.registry.type_names().len();
                 let (bidir_count, poly_count) = count_relation_stats(config);
                 println!(
-                    "types.yaml is valid ({type_count} types, {bidir_count} bidirectional relations, {poly_count} polymorphic fields)."
+                    "types.yaml is valid ({type_count} types, {bidir_count} bidirectional link fields, {poly_count} polymorphic fields)."
                 );
             } else {
                 for issue in &issues {
@@ -88,9 +88,11 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
                 let err_count = issues.iter().filter(|e| e.starts_with("ERROR")).count();
                 let warn_count = issues.iter().filter(|e| e.starts_with("WARN")).count();
                 println!("\n{err_count} error(s), {warn_count} warning(s).");
-                return Err(CortxError::Validation(format!(
-                    "{err_count} schema error(s) found"
-                )));
+                if err_count > 0 {
+                    return Err(CortxError::Validation(format!(
+                        "{err_count} schema error(s) found"
+                    )));
+                }
             }
         }
 
@@ -243,7 +245,7 @@ fn validate_schema_types(config: &Config) -> Vec<String> {
             // inverse_one on array[link] doesn't make sense
             if link_def.inverse_one && is_array {
                 issues.push(format!(
-                    "WARN  {type_name}.{field_name} — inverse_one: true on array[link] field (ignored)"
+                    "WARN   {type_name}.{field_name} — inverse_one: true on array[link] field (ignored)"
                 ));
             }
 

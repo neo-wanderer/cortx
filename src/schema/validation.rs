@@ -100,7 +100,10 @@ pub fn validate_frontmatter(
                         errors.push(format!("field '{field_name}' must be a number"));
                     }
                 }
-                FieldType::String | FieldType::Link(_) | FieldType::ArrayLink(_) | FieldType::Datetime => {
+                FieldType::String
+                | FieldType::Link(_)
+                | FieldType::ArrayLink(_)
+                | FieldType::Datetime => {
                     // String-like fields; link refs are string IDs — no value-level validation here
                 }
             }

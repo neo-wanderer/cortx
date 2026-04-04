@@ -3,8 +3,8 @@ use crate::entity::Entity;
 use crate::error::{CortxError, Result};
 use crate::query::evaluator::evaluate;
 use crate::query::parser::parse_query;
-use crate::storage::markdown::MarkdownRepository;
 use crate::storage::Repository;
+use crate::storage::markdown::MarkdownRepository;
 use crate::value::Value;
 use clap::Args;
 use std::cmp::Ordering;
@@ -129,11 +129,7 @@ fn compare_values(a: Option<&Value>, b: Option<&Value>, descending: bool) -> Ord
     match (a, b) {
         (Some(av), Some(bv)) => {
             let cmp = av.partial_cmp(bv).unwrap_or(Ordering::Equal);
-            if descending {
-                cmp.reverse()
-            } else {
-                cmp
-            }
+            if descending { cmp.reverse() } else { cmp }
         }
         (None, None) => Ordering::Equal,
         (Some(_), None) => Ordering::Less,    // Nulls to end

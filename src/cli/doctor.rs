@@ -74,7 +74,9 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
                         Some(Value::String(s)) if !s.is_empty() => vec![s.clone()],
                         Some(Value::Array(items)) => items
                             .iter()
-                            .filter_map(|v| v.as_str().filter(|s| !s.is_empty()).map(|s| s.to_string()))
+                            .filter_map(|v| {
+                                v.as_str().filter(|s| !s.is_empty()).map(|s| s.to_string())
+                            })
                             .collect(),
                         _ => continue,
                     };
@@ -129,7 +131,9 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
                         } else {
                             // Many-to-one / many-to-many: inverse field is an array
                             match ref_entity.frontmatter.get(&inverse_field) {
-                                Some(Value::Array(items)) => items.contains(&Value::String(entity.id.clone())),
+                                Some(Value::Array(items)) => {
+                                    items.contains(&Value::String(entity.id.clone()))
+                                }
                                 _ => false,
                             }
                         };
@@ -145,10 +149,14 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
                                 let mut updates = HashMap::new();
                                 if link_def.inverse_one {
                                     // One-to-one: set inverse field to scalar string
-                                    updates.insert(inverse_field.clone(), Value::String(entity.id.clone()));
+                                    updates.insert(
+                                        inverse_field.clone(),
+                                        Value::String(entity.id.clone()),
+                                    );
                                 } else {
                                     // Many: append to array
-                                    let mut items = match ref_entity.frontmatter.get(&inverse_field) {
+                                    let mut items = match ref_entity.frontmatter.get(&inverse_field)
+                                    {
                                         Some(Value::Array(arr)) => arr.clone(),
                                         _ => vec![],
                                     };

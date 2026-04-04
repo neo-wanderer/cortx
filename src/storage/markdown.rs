@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-use super::file_lock;
 use super::Repository;
+use super::file_lock;
 use crate::entity::Entity;
 use crate::error::{CortxError, Result};
 use crate::frontmatter::{parse_frontmatter, serialize_entity};

@@ -1688,10 +1688,12 @@ fn test_vault_name_flag_resolves_correct_vault() {
         .success()
         .stdout(predicate::str::contains("Created task-named-vault"));
     // Verify the file exists in the named vault
-    assert!(vault_dir
-        .path()
-        .join("1_Projects/tasks/task-named-vault.md")
-        .exists());
+    assert!(
+        vault_dir
+            .path()
+            .join("1_Projects/tasks/task-named-vault.md")
+            .exists()
+    );
 }
 
 #[test]

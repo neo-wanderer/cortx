@@ -242,10 +242,12 @@ fn test_validate_bool_field_rejects_non_bool() {
     fm.insert("active".into(), Value::String("yes".into()));
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("must be a boolean"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("must be a boolean")
+    );
 }
 
 #[test]

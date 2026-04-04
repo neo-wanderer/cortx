@@ -2,9 +2,9 @@ mod common;
 
 use common::TestVault;
 use cortx::schema::registry::TypeRegistry;
+use cortx::storage::Repository;
 use cortx::storage::file_lock::FileLock;
 use cortx::storage::markdown::MarkdownRepository;
-use cortx::storage::Repository;
 use cortx::value::Value;
 use std::collections::HashMap;
 

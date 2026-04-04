@@ -6,5 +6,6 @@ pub mod frontmatter;
 pub mod global_config;
 pub mod query;
 pub mod schema;
+pub mod slug;
 pub mod storage;
 pub mod value;

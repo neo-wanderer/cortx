@@ -12,9 +12,9 @@ use std::collections::HashMap;
 /// use cortx::frontmatter::parse_frontmatter;
 /// use cortx::value::Value;
 ///
-/// let content = "---\nid: task-1\ntype: task\n---\n# Body\n";
+/// let content = "---\ntype: task\ntitle: Do the thing\n---\n# Body\n";
 /// let (fm, body) = parse_frontmatter(content).unwrap();
-/// assert_eq!(fm.get("id").unwrap(), &Value::String("task-1".into()));
+/// assert_eq!(fm.get("type").unwrap(), &Value::String("task".into()));
 /// assert!(body.contains("# Body"));
 /// ```
 ///
@@ -65,12 +65,12 @@ pub fn parse_frontmatter(content: &str) -> Result<(HashMap<String, Value>, Strin
 /// use std::collections::HashMap;
 ///
 /// let mut fm = HashMap::new();
-/// fm.insert("id".into(), Value::String("task-1".into()));
 /// fm.insert("type".into(), Value::String("task".into()));
+/// fm.insert("title".into(), Value::String("Do the thing".into()));
 ///
 /// let output = serialize_entity(&fm, "# Notes\n");
 /// assert!(output.starts_with("---\n"));
-/// assert!(output.contains("id: task-1"));
+/// assert!(output.contains("title: Do the thing"));
 /// assert!(output.ends_with("# Notes\n"));
 /// ```
 pub fn serialize_entity(frontmatter: &HashMap<String, Value>, body: &str) -> String {

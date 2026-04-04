@@ -283,7 +283,7 @@ fn test_note_headings_and_insert() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-test.md",
-        "---\nid: note-test\ntype: note\ntitle: Test Note\ntags: []\n---\n# Overview\n\nSome text.\n\n## Action Items\n\n- Item 1\n",
+        "---\ntype: note\ntitle: Test Note\ntags: []\n---\n# Overview\n\nSome text.\n\n## Action Items\n\n- Item 1\n",
     );
     cortx_cmd(&vault)
         .args(["note", "headings", "note-test"])
@@ -526,7 +526,7 @@ fn test_doctor_validate_with_errors() {
     // Write a task file missing required fields
     vault.write_file(
         "1_Projects/tasks/task-bad.md",
-        "---\nid: task-bad\ntype: task\n---\nBad task.\n",
+        "---\ntype: task\n---\nBad task.\n",
     );
     cortx_cmd(&vault)
         .args(["doctor", "validate"])
@@ -599,7 +599,7 @@ fn test_note_replace_block() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-block.md",
-        "---\nid: note-block\ntype: note\ntitle: Block test\ntags: []\n---\n# Content\n\n<!-- block:id=summary -->\nOld summary.\n<!-- /block:id=summary -->\n\nMore text.\n",
+        "---\ntype: note\ntitle: Block test\ntags: []\n---\n# Content\n\n<!-- block:id=summary -->\nOld summary.\n<!-- /block:id=summary -->\n\nMore text.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -626,7 +626,7 @@ fn test_note_read_lines() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-lines.md",
-        "---\nid: note-lines\ntype: note\ntitle: Lines test\ntags: []\n---\nLine one.\nLine two.\nLine three.\nLine four.\n",
+        "---\ntype: note\ntitle: Lines test\ntags: []\n---\nLine one.\nLine two.\nLine three.\nLine four.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -651,7 +651,7 @@ fn test_note_insert_after_heading_not_found() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-nohead.md",
-        "---\nid: note-nohead\ntype: note\ntitle: No Head\ntags: []\n---\nSome text.\n",
+        "---\ntype: note\ntitle: No Head\ntags: []\n---\nSome text.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -672,7 +672,7 @@ fn test_note_replace_block_not_found() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-noblock.md",
-        "---\nid: note-noblock\ntype: note\ntitle: No Block\ntags: []\n---\nSome text.\n",
+        "---\ntype: note\ntitle: No Block\ntags: []\n---\nSome text.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -794,7 +794,7 @@ fn test_show_with_body() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-body.md",
-        "---\nid: note-body\ntype: note\ntitle: Body test\ntags: []\n---\n# Important\n\nThis is the body.\n",
+        "---\ntype: note\ntitle: Body test\ntags: []\n---\n# Important\n\nThis is the body.\n",
     );
     cortx_cmd(&vault)
         .args(["show", "note-body"])
@@ -811,7 +811,7 @@ fn test_note_replace_block_missing_close_tag() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-noclose.md",
-        "---\nid: note-noclose\ntype: note\ntitle: No Close\ntags: []\n---\n<!-- block:id=test -->\nContent here.\n",
+        "---\ntype: note\ntitle: No Close\ntags: []\n---\n<!-- block:id=test -->\nContent here.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -1012,7 +1012,7 @@ fn test_query_quoted_field_name() {
     // Create entity with a field containing a space
     vault.write_file(
         "1_Projects/tasks/task-custom.md",
-        "---\nid: task-custom\ntype: task\ntitle: Custom Field Task\nstatus: open\nDue By: 2026-04-15\ntags: []\n---\nBody.\n",
+        "---\ntype: task\ntitle: Custom Field Task\nstatus: open\nDue By: 2026-04-15\ntags: []\n---\nBody.\n",
     );
     cortx_cmd(&vault)
         .args(["query", r#""Due By" = "2026-04-15""#])
@@ -1819,9 +1819,8 @@ fn test_schema_types_custom_vault() {
     let custom_types = r#"types:
   recipe:
     folder: "6_Recipes"
-    required: [id, type, title]
+    required: [type, title]
     fields:
-      id:    { type: string }
       type:  { const: recipe }
       title: { type: string }
 "#;

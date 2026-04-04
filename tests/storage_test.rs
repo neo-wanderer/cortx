@@ -19,7 +19,6 @@ fn test_create_entity() {
     let repo = MarkdownRepository::new(vault.path().to_path_buf());
 
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do the thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -38,7 +37,7 @@ fn test_get_entity_by_id() {
 
     vault.write_file(
         "5_People/person-jane.md",
-        "---\nid: person-jane\ntype: person\nname: Jane Doe\ntags: []\n---\n# Jane\n",
+        "---\ntype: person\nname: Jane Doe\ntags: []\n---\n# Jane\n",
     );
 
     let entity = repo.get_by_id("person-jane", &registry).unwrap();
@@ -57,7 +56,7 @@ fn test_update_entity() {
 
     vault.write_file(
         "1_Projects/tasks/task-002.md",
-        "---\nid: task-002\ntype: task\ntitle: Old title\nstatus: open\ntags: []\n---\n# Notes\n",
+        "---\ntype: task\ntitle: Old title\nstatus: open\ntags: []\n---\n# Notes\n",
     );
 
     let mut updates = HashMap::new();
@@ -78,11 +77,11 @@ fn test_list_entities_by_type() {
 
     vault.write_file(
         "1_Projects/tasks/task-a.md",
-        "---\nid: task-a\ntype: task\ntitle: A\nstatus: open\ntags: []\n---\n",
+        "---\ntype: task\ntitle: A\nstatus: open\ntags: []\n---\n",
     );
     vault.write_file(
         "1_Projects/tasks/task-b.md",
-        "---\nid: task-b\ntype: task\ntitle: B\nstatus: done\ntags: []\n---\n",
+        "---\ntype: task\ntitle: B\nstatus: done\ntags: []\n---\n",
     );
 
     let entities = repo.list_by_type("task", &registry).unwrap();
@@ -97,7 +96,7 @@ fn test_delete_entity() {
 
     vault.write_file(
         "1_Projects/tasks/task-del.md",
-        "---\nid: task-del\ntype: task\ntitle: Delete me\nstatus: open\ntags: []\n---\n",
+        "---\ntype: task\ntitle: Delete me\nstatus: open\ntags: []\n---\n",
     );
 
     repo.delete("task-del", &registry).unwrap();
@@ -157,7 +156,7 @@ fn test_update_with_locking() {
 
     vault.write_file(
         "1_Projects/tasks/task-lock.md",
-        "---\nid: task-lock\ntype: task\ntitle: Lock test\nstatus: open\ntags: []\n---\n",
+        "---\ntype: task\ntitle: Lock test\nstatus: open\ntags: []\n---\n",
     );
 
     let mut updates = HashMap::new();
@@ -176,7 +175,6 @@ fn test_create_duplicate_entity() {
     let repo = MarkdownRepository::new(vault.path().to_path_buf());
 
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-dup".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("First".into()));
     fm.insert("status".into(), Value::String("open".into()));

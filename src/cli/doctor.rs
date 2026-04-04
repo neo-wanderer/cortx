@@ -1,10 +1,11 @@
 use crate::config::Config;
-use crate::error::Result;
+use crate::error::{CortxError, Result};
 use crate::schema::validation::validate_frontmatter;
 use crate::storage::Repository;
 use crate::storage::markdown::MarkdownRepository;
+use crate::value::Value;
 use clap::{Args, Subcommand};
-use regex::Regex;
+use std::collections::HashMap;
 
 #[derive(Args)]
 pub struct DoctorArgs {
@@ -16,8 +17,11 @@ pub struct DoctorArgs {
 pub enum DoctorCommands {
     /// Validate all files against schemas
     Validate,
-    /// Check for broken links
-    Links,
+    /// Check bidirectional relation consistency; use --fix to auto-repair missing inverses
+    Links {
+        #[arg(long, default_value_t = false)]
+        fix: bool,
+    },
 }
 
 pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
@@ -46,46 +50,102 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
                 );
             }
         }
-        DoctorCommands::Links => {
-            let all = repo.list_all(&config.registry)?;
-            let all_ids: std::collections::HashSet<String> =
-                all.iter().map(|e| e.id.clone()).collect();
+        DoctorCommands::Links { fix } => {
+            use crate::schema::types::{FieldType, LinkTargets};
 
-            let link_re = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
-            let mut broken = 0;
+            let all = repo.list_all(&config.registry)?;
+            let mut issues = 0;
+            let mut repaired = 0;
 
             for entity in &all {
-                for (field, val) in &entity.frontmatter {
-                    if let Some(s) = val.as_str() {
-                        for cap in link_re.captures_iter(s) {
-                            let target = &cap[1];
-                            if !all_ids.contains(target) {
-                                broken += 1;
-                                println!(
-                                    "BROKEN LINK in {} ({}): field '{}' -> [[{}]]",
-                                    entity.id, entity.entity_type, field, target
-                                );
+                let type_def = match config.registry.get(&entity.entity_type) {
+                    Some(d) => d,
+                    None => continue,
+                };
+
+                for (field_name, field_def) in &type_def.fields {
+                    let link_def = match &field_def.field_type {
+                        FieldType::Link(d) | FieldType::ArrayLink(d) if d.bidirectional => d,
+                        _ => continue,
+                    };
+
+                    let ref_id = match entity.frontmatter.get(field_name).and_then(|v| v.as_str()) {
+                        Some(s) if !s.is_empty() => s.to_string(),
+                        _ => continue,
+                    };
+
+                    let (_ref_type_name, inverse_field) = match &link_def.targets {
+                        LinkTargets::Single {
+                            ref_type,
+                            inverse: Some(inv),
+                        } => (ref_type.clone(), inv.clone()),
+                        LinkTargets::Poly(targets) => {
+                            let matched = targets.iter().find_map(|t| {
+                                let ref_path = config
+                                    .vault_path
+                                    .join(&config.registry.get(&t.ref_type)?.folder)
+                                    .join(format!("{ref_id}.md"));
+                                if ref_path.exists() {
+                                    t.inverse.clone().map(|inv| (t.ref_type.clone(), inv))
+                                } else {
+                                    None
+                                }
+                            });
+                            match matched {
+                                Some(pair) => pair,
+                                None => continue,
                             }
                         }
-                    }
-                }
+                        _ => continue,
+                    };
 
-                for cap in link_re.captures_iter(&entity.body) {
-                    let target = &cap[1];
-                    if !all_ids.contains(target) {
-                        broken += 1;
+                    let ref_entity = match repo.get_by_id(&ref_id, &config.registry) {
+                        Ok(e) => e,
+                        Err(_) => continue,
+                    };
+
+                    let has_back_ref = match ref_entity.frontmatter.get(&inverse_field) {
+                        Some(Value::Array(items)) => {
+                            items.contains(&Value::String(entity.id.clone()))
+                        }
+                        _ => false,
+                    };
+
+                    if !has_back_ref {
+                        issues += 1;
                         println!(
-                            "BROKEN LINK in {} ({}): body -> [[{}]]",
-                            entity.id, entity.entity_type, target
+                            "MISSING INVERSE: {}.{} = {} — {}.{} does not contain {}",
+                            entity.id, field_name, ref_id, ref_id, inverse_field, entity.id
                         );
+
+                        if *fix {
+                            let mut updates = HashMap::new();
+                            let mut items = match ref_entity.frontmatter.get(&inverse_field) {
+                                Some(Value::Array(arr)) => arr.clone(),
+                                _ => vec![],
+                            };
+                            items.push(Value::String(entity.id.clone()));
+                            updates.insert(inverse_field.clone(), Value::Array(items));
+                            repo.update(&ref_id, updates, &config.registry)?;
+                            repaired += 1;
+                            println!("  FIXED");
+                        }
                     }
                 }
             }
 
-            if broken == 0 {
-                println!("No broken links found across {} entities.", all.len());
+            if issues == 0 {
+                println!(
+                    "No bidirectional relation inconsistencies found across {} entities.",
+                    all.len()
+                );
+            } else if *fix {
+                println!("\n{issues} issue(s) found, {repaired} repaired.");
             } else {
-                println!("\n{broken} broken link(s) found.");
+                println!("\n{issues} issue(s) found. Run with --fix to auto-repair.");
+                return Err(CortxError::Validation(format!(
+                    "{issues} relation inconsistency/ies"
+                )));
             }
         }
     }

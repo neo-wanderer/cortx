@@ -426,37 +426,98 @@ fn test_doctor_links_no_broken() {
         .args(["doctor", "links"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("No broken links"));
+        .stdout(predicate::str::contains(
+            "No bidirectional relation inconsistencies found",
+        ));
 }
 
 #[test]
-fn test_doctor_links_finds_broken_in_body() {
+fn test_doctor_links_no_issues_when_inverse_present() {
     let vault = TestVault::new();
     vault.write_file(
-        "3_Resources/notes/note-links.md",
-        "---\nid: note-links\ntype: note\ntitle: Links test\ntags: []\n---\nSee [[nonexistent-entity]].\n",
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    vault.write_file(
+        "goals/q2-goals.md",
+        "---\ntype: goal\ntitle: Q2 Goals\ntasks:\n  - fix-login\ntags: []\n---\n",
+    );
+    vault.write_file(
+        "tasks/fix-login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
     );
     cortx_cmd(&vault)
         .args(["doctor", "links"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("BROKEN LINK"))
-        .stdout(predicate::str::contains("nonexistent-entity"));
+        .stdout(predicate::str::contains(
+            "No bidirectional relation inconsistencies found",
+        ));
 }
 
 #[test]
 fn test_doctor_links_finds_broken_in_frontmatter() {
     let vault = TestVault::new();
     vault.write_file(
-        "3_Resources/notes/note-fmlink.md",
-        "---\nid: note-fmlink\ntype: note\ntitle: FM Links\ntags: []\nref: '[[missing-ref]]'\n---\nBody.\n",
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    vault.write_file(
+        "goals/q2-goals.md",
+        "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
+    );
+    vault.write_file(
+        "tasks/fix-login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
     );
     cortx_cmd(&vault)
         .args(["doctor", "links"])
         .assert()
-        .success()
-        .stdout(predicate::str::contains("BROKEN LINK"))
-        .stdout(predicate::str::contains("missing-ref"));
+        .failure()
+        .stdout(predicate::str::contains("MISSING INVERSE"))
+        .stdout(predicate::str::contains("fix-login"));
 }
 
 #[test]
@@ -2045,5 +2106,98 @@ fn test_bidirectional_update_adds_to_inverse() {
     assert!(
         goal_content.contains("fix-login-bug"),
         "goal.tasks should contain the task after update: {goal_content}"
+    );
+}
+
+#[test]
+fn test_doctor_links_detects_missing_inverse() {
+    let vault = TestVault::new();
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    vault.write_file(
+        "goals/q2-goals.md",
+        "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
+    );
+    vault.write_file(
+        "tasks/fix-login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
+    );
+
+    cortx_cmd(&vault)
+        .args(["doctor", "links"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("fix-login"));
+}
+
+#[test]
+fn test_doctor_links_fix_repairs_inverse() {
+    let vault = TestVault::new();
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    vault.write_file(
+        "goals/q2-goals.md",
+        "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
+    );
+    vault.write_file(
+        "tasks/fix-login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
+    );
+
+    cortx_cmd(&vault)
+        .args(["doctor", "links", "--fix"])
+        .assert()
+        .success();
+
+    let goal_content = vault.read_file("goals/q2-goals.md");
+    assert!(
+        goal_content.contains("fix-login"),
+        "goal.tasks should contain fix-login after --fix: {goal_content}"
     );
 }

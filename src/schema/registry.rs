@@ -1,4 +1,4 @@
-use super::types::{FieldDefinition, FieldType, TypeDefinition};
+use super::types::{FieldDefinition, FieldType, LinkDef, LinkTargets, PolyTarget, TypeDefinition};
 use crate::error::{CortxError, Result};
 use std::collections::HashMap;
 
@@ -124,10 +124,8 @@ impl TypeRegistry {
                 "bool" => FieldType::Bool,
                 "number" => FieldType::Number,
                 "array[string]" => FieldType::ArrayString,
-                t if t.starts_with("link") => {
-                    let ref_type = val.get("ref").and_then(|v| v.as_str()).map(String::from);
-                    FieldType::Link { ref_type }
-                }
+                "link" => FieldType::Link(Self::parse_link_def(val)?),
+                "array[link]" => FieldType::ArrayLink(Self::parse_link_def(val)?),
                 other => {
                     return Err(CortxError::Schema(format!(
                         "unknown field type '{other}' for field '{field_name}'"
@@ -153,6 +151,76 @@ impl TypeRegistry {
             field_type,
             required: is_required && !is_optional,
             default,
+        })
+    }
+
+    fn parse_link_def(val: &serde_yaml::Value) -> Result<LinkDef> {
+        let bidirectional = val
+            .get("bidirectional")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let inverse_one = val
+            .get("inverse_one")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        let targets = match val.get("ref") {
+            // ref: "goal"
+            Some(v) if v.as_str().is_some() => {
+                let ref_type = v.as_str().unwrap().to_string();
+                let inverse = if bidirectional {
+                    val.get("inverse")
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
+                } else {
+                    None
+                };
+                LinkTargets::Single { ref_type, inverse }
+            }
+            // ref: [goal, task, note]
+            Some(v) if v.as_sequence().is_some() => {
+                let targets = v
+                    .as_sequence()
+                    .unwrap()
+                    .iter()
+                    .filter_map(|t| t.as_str())
+                    .map(|ref_type| PolyTarget {
+                        ref_type: ref_type.to_string(),
+                        inverse: None,
+                    })
+                    .collect();
+                LinkTargets::Poly(targets)
+            }
+            // ref: { goal: { inverse: related_notes }, task: { inverse: related_notes } }
+            Some(v) if v.as_mapping().is_some() => {
+                let targets = v
+                    .as_mapping()
+                    .unwrap()
+                    .iter()
+                    .map(|(k, v)| {
+                        let ref_type = k.as_str().unwrap_or("").to_string();
+                        let inverse = v.get("inverse").and_then(|i| i.as_str()).map(String::from);
+                        PolyTarget { ref_type, inverse }
+                    })
+                    .collect();
+                LinkTargets::Poly(targets)
+            }
+            // No ref specified
+            None => LinkTargets::Single {
+                ref_type: String::new(),
+                inverse: None,
+            },
+            _ => {
+                return Err(CortxError::Schema(
+                    "link field 'ref' must be a string, sequence, or mapping".into(),
+                ));
+            }
+        };
+
+        Ok(LinkDef {
+            targets,
+            bidirectional,
+            inverse_one,
         })
     }
 }

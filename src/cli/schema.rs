@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::error::{CortxError, Result};
-use crate::schema::types::FieldType;
+use crate::schema::types::{FieldType, LinkDef, LinkTargets};
 use clap::{Args, Subcommand};
 
 #[derive(Args)]
@@ -34,8 +34,19 @@ fn field_type_str(ft: &FieldType) -> String {
         FieldType::ArrayString => "array[string]".into(),
         FieldType::Const(v) => format!("const:{v}"),
         FieldType::Enum(variants) => format!("enum[{}]", variants.join(",")),
-        FieldType::Link { ref_type: Some(r) } => format!("link:{r}"),
-        FieldType::Link { ref_type: None } => "link".into(),
+        FieldType::Link(def) => format!("link:{}", link_targets_str(def)),
+        FieldType::ArrayLink(def) => format!("array[link]:{}", link_targets_str(def)),
+    }
+}
+
+fn link_targets_str(def: &LinkDef) -> String {
+    match &def.targets {
+        LinkTargets::Single { ref_type, .. } => ref_type.clone(),
+        LinkTargets::Poly(targets) => targets
+            .iter()
+            .map(|t| t.ref_type.as_str())
+            .collect::<Vec<_>>()
+            .join("|"),
     }
 }
 
@@ -94,10 +105,32 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
                                 ),
                             );
                         }
-                        FieldType::Link { ref_type } => {
-                            obj.insert("type".into(), serde_json::Value::String("link".into()));
-                            if let Some(r) = ref_type {
-                                obj.insert("ref".into(), serde_json::Value::String(r.clone()));
+                        FieldType::Link(link_def) | FieldType::ArrayLink(link_def) => {
+                            let is_array = matches!(field.field_type, FieldType::ArrayLink(_));
+                            obj.insert(
+                                "type".into(),
+                                serde_json::Value::String(
+                                    if is_array { "array[link]" } else { "link" }.into(),
+                                ),
+                            );
+                            match &link_def.targets {
+                                LinkTargets::Single { ref_type, .. } if !ref_type.is_empty() => {
+                                    obj.insert(
+                                        "ref".into(),
+                                        serde_json::Value::String(ref_type.clone()),
+                                    );
+                                }
+                                LinkTargets::Poly(targets) => {
+                                    let refs: Vec<serde_json::Value> = targets
+                                        .iter()
+                                        .map(|t| serde_json::Value::String(t.ref_type.clone()))
+                                        .collect();
+                                    obj.insert("ref".into(), serde_json::Value::Array(refs));
+                                }
+                                _ => {}
+                            }
+                            if link_def.bidirectional {
+                                obj.insert("bidirectional".into(), serde_json::Value::Bool(true));
                             }
                         }
                         _ => {

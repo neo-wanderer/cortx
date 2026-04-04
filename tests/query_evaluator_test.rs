@@ -12,7 +12,7 @@ fn make_entity(fields: Vec<(&str, Value)>, body: &str) -> Entity {
     for (k, v) in fields {
         fm.insert(k.into(), v);
     }
-    Entity::new(fm, body.into())
+    Entity::new("e-001".into(), fm, body.into())
 }
 
 // -- Missing field behavior --
@@ -104,7 +104,11 @@ fn make_task(status: &str, due: &str, tags: Vec<&str>) -> Entity {
         "tags".into(),
         Value::Array(tags.iter().map(|t| Value::String(t.to_string())).collect()),
     );
-    Entity::new(fm, "Some body text about protein shakes.".into())
+    Entity::new(
+        "task-001".into(),
+        fm,
+        "Some body text about protein shakes.".into(),
+    )
 }
 
 #[test]

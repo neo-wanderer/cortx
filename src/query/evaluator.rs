@@ -17,7 +17,7 @@ use crate::value::Value;
 /// fm.insert("id".into(), Value::String("t1".into()));
 /// fm.insert("type".into(), Value::String("task".into()));
 /// fm.insert("status".into(), Value::String("open".into()));
-/// let entity = Entity::new(fm, "some body".into());
+/// let entity = Entity::new("t1".into(), fm, "some body".into());
 ///
 /// let expr = parse_query(r#"status = "open""#).unwrap();
 /// assert!(evaluate(&expr, &entity));

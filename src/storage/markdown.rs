@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-use super::Repository;
 use super::file_lock;
+use super::Repository;
 use crate::entity::Entity;
 use crate::error::{CortxError, Result};
 use crate::frontmatter::{parse_frontmatter, serialize_entity};
@@ -49,7 +49,12 @@ impl MarkdownRepository {
     fn read_entity(&self, path: &Path) -> Result<Entity> {
         let content = std::fs::read_to_string(path)?;
         let (fm, body) = parse_frontmatter(&content)?;
-        Ok(Entity::new(fm, body).with_path(path.to_path_buf()))
+        let id = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+        Ok(Entity::new(id, fm, body).with_path(path.to_path_buf()))
     }
 
     fn scan_folder(&self, folder: &Path) -> Result<Vec<Entity>> {
@@ -114,7 +119,7 @@ impl Repository for MarkdownRepository {
         let content = serialize_entity(&frontmatter, body);
         std::fs::write(&path, content)?;
 
-        Ok(Entity::new(frontmatter, body.to_string()).with_path(path))
+        Ok(Entity::new(id.to_string(), frontmatter, body.to_string()).with_path(path))
     }
 
     fn get_by_id(&self, id: &str, registry: &TypeRegistry) -> Result<Entity> {

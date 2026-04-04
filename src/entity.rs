@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 /// A Second Brain entity parsed from a Markdown file.
 ///
-/// Each entity has YAML frontmatter (structured metadata) and a Markdown body.
-/// The `id` and `entity_type` are extracted from frontmatter for convenience.
+/// The `id` is the filename stem — not stored in frontmatter. This keeps
+/// frontmatter clean and Obsidian-compatible.
 ///
 /// # Examples
 ///
@@ -15,12 +15,11 @@ use std::path::PathBuf;
 /// use std::collections::HashMap;
 ///
 /// let mut fm = HashMap::new();
-/// fm.insert("id".into(), Value::String("task-1".into()));
 /// fm.insert("type".into(), Value::String("task".into()));
 /// fm.insert("title".into(), Value::String("Buy milk".into()));
 ///
-/// let entity = Entity::new(fm, "# Notes\n".into());
-/// assert_eq!(entity.id, "task-1");
+/// let entity = Entity::new("buy-milk".into(), fm, "# Notes\n".into());
+/// assert_eq!(entity.id, "buy-milk");
 /// assert_eq!(entity.entity_type, "task");
 /// assert_eq!(entity.title(), "Buy milk");
 /// ```
@@ -34,12 +33,7 @@ pub struct Entity {
 }
 
 impl Entity {
-    pub fn new(frontmatter: HashMap<String, Value>, body: String) -> Self {
-        let id = frontmatter
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string();
+    pub fn new(id: String, frontmatter: HashMap<String, Value>, body: String) -> Self {
         let entity_type = frontmatter
             .get("type")
             .and_then(|v| v.as_str())

@@ -229,9 +229,9 @@ This keeps the CLI simple and gives agents full control over naming conventions.
 
 ## 5. Open Questions
 
-- [ ] `cortx doctor links` repair mode: report-only vs. auto-repair flag?
-- [ ] Slug generation: should Unicode characters be transliterated or stripped?
-- [ ] When renaming a file (title change), should cortx offer a `cortx rename <id> <new-id>` command that updates all back-references atomically?
+- [x] `cortx doctor links` repair mode: **report-only by default, `--fix` flag to auto-repair.** Consistent with `eslint --fix` / `rustfmt` convention. Agents can call `cortx doctor links --fix` as part of scheduled maintenance.
+- [x] Slug generation: **transliterate Unicode to ASCII** using the `deunicode` crate. `"Réunion café"` → `reunion-cafe.md`. Preserves readability; handles fully non-Latin titles (e.g., Japanese) better than stripping.
+- [x] Rename command: **out of scope for now.** Obsidian handles link updates within its vault. `cortx doctor links` surfaces broken references after a manual rename. Revisit as a v2 feature once the core relation system is stable.
 
 ---
 

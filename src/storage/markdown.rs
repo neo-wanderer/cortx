@@ -57,6 +57,93 @@ impl MarkdownRepository {
         Ok(Entity::new(id, fm, body).with_path(path.to_path_buf()))
     }
 
+    /// If `field_name` is a bidirectional link in the schema, update the inverse
+    /// field on the referenced entity. Acquires locks on both files; lower path first.
+    fn apply_bidirectional(
+        &self,
+        owning_path: &Path,
+        owning_id: &str,
+        field_name: &str,
+        new_value: &Value,
+        registry: &TypeRegistry,
+        type_def: &crate::schema::types::TypeDefinition,
+    ) -> Result<()> {
+        use crate::schema::types::{FieldType, LinkTargets};
+
+        let field_def = match type_def.fields.get(field_name) {
+            Some(f) => f,
+            None => return Ok(()),
+        };
+
+        let link_def = match &field_def.field_type {
+            FieldType::Link(d) | FieldType::ArrayLink(d) if d.bidirectional => d,
+            _ => return Ok(()),
+        };
+
+        let ref_id = match new_value.as_str() {
+            Some(s) if !s.is_empty() => s.to_string(),
+            _ => return Ok(()),
+        };
+
+        let (ref_type, inverse_field) = match &link_def.targets {
+            LinkTargets::Single {
+                ref_type,
+                inverse: Some(inv),
+            } => (ref_type.clone(), inv.clone()),
+            LinkTargets::Poly(targets) => {
+                let matched = targets.iter().find_map(|t| {
+                    let ref_path = self.resolve_path(&t.ref_type, &ref_id, registry).ok()?;
+                    if ref_path.exists() {
+                        t.inverse
+                            .as_deref()
+                            .map(|inv| (t.ref_type.clone(), inv.to_string()))
+                    } else {
+                        None
+                    }
+                });
+                match matched {
+                    Some((rt, inv)) => (rt, inv),
+                    None => return Ok(()),
+                }
+            }
+            _ => return Ok(()),
+        };
+
+        let ref_path = self.resolve_path(&ref_type, &ref_id, registry)?;
+        if !ref_path.exists() {
+            return Ok(());
+        }
+
+        // Lock ordering: lexicographically lower path first to prevent deadlocks
+        let (first_path, second_path) = if owning_path < ref_path.as_path() {
+            (owning_path.to_path_buf(), ref_path.clone())
+        } else {
+            (ref_path.clone(), owning_path.to_path_buf())
+        };
+
+        let _lock1 = file_lock::FileLock::acquire(&first_path)?;
+        let _lock2 = file_lock::FileLock::acquire(&second_path)?;
+
+        let ref_content = std::fs::read_to_string(&ref_path)?;
+        let (mut ref_fm, ref_body) = parse_frontmatter(&ref_content)?;
+
+        let arr = ref_fm
+            .entry(inverse_field)
+            .or_insert_with(|| Value::Array(vec![]));
+
+        if let Value::Array(items) = arr {
+            let id_val = Value::String(owning_id.to_string());
+            if !items.contains(&id_val) {
+                items.push(id_val);
+            }
+        }
+
+        let updated = serialize_entity(&ref_fm, &ref_body);
+        std::fs::write(&ref_path, updated)?;
+
+        Ok(())
+    }
+
     fn scan_folder(&self, folder: &Path) -> Result<Vec<Entity>> {
         if !folder.exists() {
             return Ok(Vec::new());
@@ -115,6 +202,11 @@ impl Repository for MarkdownRepository {
         let content = serialize_entity(&frontmatter, body);
         std::fs::write(&path, content)?;
 
+        // Maintain bidirectional inverse fields
+        for (field_name, value) in &frontmatter {
+            self.apply_bidirectional(&path, id, field_name, value, registry, type_def)?;
+        }
+
         Ok(Entity::new(id.to_string(), frontmatter, body.to_string()).with_path(path))
     }
 
@@ -136,6 +228,8 @@ impl Repository for MarkdownRepository {
 
         let mut entity = self.read_entity(&path)?;
 
+        let updates_snapshot = updates.clone();
+
         for (key, val) in updates {
             entity.frontmatter.insert(key, val);
         }
@@ -153,6 +247,14 @@ impl Repository for MarkdownRepository {
         std::fs::write(&path, content)?;
 
         lock.release()?;
+
+        // Maintain bidirectional inverse fields for link fields that changed
+        let type_def_for_bidir = registry.get(&entity.entity_type);
+        if let Some(type_def) = type_def_for_bidir {
+            for (field_name, value) in &updates_snapshot {
+                self.apply_bidirectional(&path, id, field_name, value, registry, type_def)?;
+            }
+        }
 
         entity.file_path = Some(path);
         Ok(entity)

@@ -1950,3 +1950,100 @@ fn test_schema_validate_warns_inverse_one_on_array_link() {
         .success() // warnings do not cause non-zero exit
         .stdout(predicate::str::contains("WARN"));
 }
+
+#[test]
+fn test_bidirectional_create_updates_inverse() {
+    let vault = TestVault::new();
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    cortx_cmd(&vault)
+        .args(["create", "goal", "--title", "Q2 Goals"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Fix login bug",
+            "--set",
+            "goal=q2-goals",
+        ])
+        .assert()
+        .success();
+    let goal_content = vault.read_file("goals/q2-goals.md");
+    assert!(
+        goal_content.contains("fix-login-bug"),
+        "goal.tasks should contain the new task id: {goal_content}"
+    );
+}
+
+#[test]
+fn test_bidirectional_update_adds_to_inverse() {
+    let vault = TestVault::new();
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    cortx_cmd(&vault)
+        .args(["create", "goal", "--title", "Q2 Goals"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Fix login bug"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args(["update", "fix-login-bug", "--set", "goal=q2-goals"])
+        .assert()
+        .success();
+    let goal_content = vault.read_file("goals/q2-goals.md");
+    assert!(
+        goal_content.contains("fix-login-bug"),
+        "goal.tasks should contain the task after update: {goal_content}"
+    );
+}

@@ -2150,7 +2150,8 @@ fn test_doctor_links_detects_missing_inverse() {
         .args(["doctor", "links"])
         .assert()
         .failure()
-        .stdout(predicate::str::contains("fix-login"));
+        .stdout(predicate::str::contains("fix-login"))
+        .stdout(predicate::str::contains("MISSING INVERSE"));
 }
 
 #[test]

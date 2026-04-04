@@ -69,66 +69,76 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
                         _ => continue,
                     };
 
-                    let ref_id = match entity.frontmatter.get(field_name).and_then(|v| v.as_str()) {
-                        Some(s) if !s.is_empty() => s.to_string(),
+                    // Collect all referenced IDs from this field (scalar link or array[link])
+                    let ref_ids: Vec<String> = match entity.frontmatter.get(field_name) {
+                        Some(Value::String(s)) if !s.is_empty() => vec![s.clone()],
+                        Some(Value::Array(items)) => items
+                            .iter()
+                            .filter_map(|v| v.as_str().filter(|s| !s.is_empty()).map(|s| s.to_string()))
+                            .collect(),
                         _ => continue,
                     };
+                    if ref_ids.is_empty() {
+                        continue;
+                    }
 
-                    let (_ref_type_name, inverse_field) = match &link_def.targets {
-                        LinkTargets::Single {
-                            ref_type,
-                            inverse: Some(inv),
-                        } => (ref_type.clone(), inv.clone()),
-                        LinkTargets::Poly(targets) => {
-                            let matched = targets.iter().find_map(|t| {
-                                let ref_path = config
-                                    .vault_path
-                                    .join(&config.registry.get(&t.ref_type)?.folder)
-                                    .join(format!("{ref_id}.md"));
-                                if ref_path.exists() {
-                                    t.inverse.clone().map(|inv| (t.ref_type.clone(), inv))
-                                } else {
-                                    None
+                    for ref_id in &ref_ids {
+                        let (_ref_type_name, inverse_field) = match &link_def.targets {
+                            LinkTargets::Single {
+                                ref_type,
+                                inverse: Some(inv),
+                            } => (ref_type.clone(), inv.clone()),
+                            LinkTargets::Poly(targets) => {
+                                let matched = targets.iter().find_map(|t| {
+                                    let ref_path = config
+                                        .vault_path
+                                        .join(&config.registry.get(&t.ref_type)?.folder)
+                                        .join(format!("{ref_id}.md"));
+                                    if ref_path.exists() {
+                                        t.inverse.clone().map(|inv| (t.ref_type.clone(), inv))
+                                    } else {
+                                        None
+                                    }
+                                });
+                                match matched {
+                                    Some(pair) => pair,
+                                    None => continue,
                                 }
-                            });
-                            match matched {
-                                Some(pair) => pair,
-                                None => continue,
                             }
-                        }
-                        _ => continue,
-                    };
+                            _ => continue,
+                        };
 
-                    let ref_entity = match repo.get_by_id(&ref_id, &config.registry) {
-                        Ok(e) => e,
-                        Err(_) => continue,
-                    };
+                        let ref_entity = match repo.get_by_id(ref_id.as_str(), &config.registry) {
+                            Ok(e) => e,
+                            Err(_) => continue,
+                        };
 
-                    let has_back_ref = match ref_entity.frontmatter.get(&inverse_field) {
-                        Some(Value::Array(items)) => {
-                            items.contains(&Value::String(entity.id.clone()))
-                        }
-                        _ => false,
-                    };
+                        let has_back_ref = match ref_entity.frontmatter.get(&inverse_field) {
+                            Some(Value::Array(items)) => {
+                                items.contains(&Value::String(entity.id.clone()))
+                            }
+                            _ => false,
+                        };
 
-                    if !has_back_ref {
-                        issues += 1;
-                        println!(
-                            "MISSING INVERSE: {}.{} = {} — {}.{} does not contain {}",
-                            entity.id, field_name, ref_id, ref_id, inverse_field, entity.id
-                        );
+                        if !has_back_ref {
+                            issues += 1;
+                            println!(
+                                "MISSING INVERSE: {}.{} = {} — {}.{} does not contain {}",
+                                entity.id, field_name, ref_id, ref_id, inverse_field, entity.id
+                            );
 
-                        if *fix {
-                            let mut updates = HashMap::new();
-                            let mut items = match ref_entity.frontmatter.get(&inverse_field) {
-                                Some(Value::Array(arr)) => arr.clone(),
-                                _ => vec![],
-                            };
-                            items.push(Value::String(entity.id.clone()));
-                            updates.insert(inverse_field.clone(), Value::Array(items));
-                            repo.update(&ref_id, updates, &config.registry)?;
-                            repaired += 1;
-                            println!("  FIXED");
+                            if *fix {
+                                let mut updates = HashMap::new();
+                                let mut items = match ref_entity.frontmatter.get(&inverse_field) {
+                                    Some(Value::Array(arr)) => arr.clone(),
+                                    _ => vec![],
+                                };
+                                items.push(Value::String(entity.id.clone()));
+                                updates.insert(inverse_field.clone(), Value::Array(items));
+                                repo.update(ref_id.as_str(), updates, &config.registry)?;
+                                repaired += 1;
+                                println!("  FIXED");
+                            }
                         }
                     }
                 }

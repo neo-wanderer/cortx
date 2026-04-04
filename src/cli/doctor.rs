@@ -110,14 +110,28 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
 
                         let ref_entity = match repo.get_by_id(ref_id.as_str(), &config.registry) {
                             Ok(e) => e,
-                            Err(_) => continue,
+                            Err(_) => {
+                                issues += 1;
+                                println!(
+                                    "DANGLING LINK: {}.{} = {} — entity '{}' not found",
+                                    entity.id, field_name, ref_id, ref_id
+                                );
+                                continue;
+                            }
                         };
 
-                        let has_back_ref = match ref_entity.frontmatter.get(&inverse_field) {
-                            Some(Value::Array(items)) => {
-                                items.contains(&Value::String(entity.id.clone()))
+                        let has_back_ref = if link_def.inverse_one {
+                            // One-to-one: inverse field is a scalar string
+                            matches!(
+                                ref_entity.frontmatter.get(&inverse_field),
+                                Some(Value::String(s)) if s == &entity.id
+                            )
+                        } else {
+                            // Many-to-one / many-to-many: inverse field is an array
+                            match ref_entity.frontmatter.get(&inverse_field) {
+                                Some(Value::Array(items)) => items.contains(&Value::String(entity.id.clone())),
+                                _ => false,
                             }
-                            _ => false,
                         };
 
                         if !has_back_ref {
@@ -129,12 +143,20 @@ pub fn run(args: &DoctorArgs, config: &Config) -> Result<()> {
 
                             if *fix {
                                 let mut updates = HashMap::new();
-                                let mut items = match ref_entity.frontmatter.get(&inverse_field) {
-                                    Some(Value::Array(arr)) => arr.clone(),
-                                    _ => vec![],
-                                };
-                                items.push(Value::String(entity.id.clone()));
-                                updates.insert(inverse_field.clone(), Value::Array(items));
+                                if link_def.inverse_one {
+                                    // One-to-one: set inverse field to scalar string
+                                    updates.insert(inverse_field.clone(), Value::String(entity.id.clone()));
+                                } else {
+                                    // Many: append to array
+                                    let mut items = match ref_entity.frontmatter.get(&inverse_field) {
+                                        Some(Value::Array(arr)) => arr.clone(),
+                                        _ => vec![],
+                                    };
+                                    if !items.contains(&Value::String(entity.id.clone())) {
+                                        items.push(Value::String(entity.id.clone()));
+                                    }
+                                    updates.insert(inverse_field.clone(), Value::Array(items));
+                                }
                                 repo.update(ref_id.as_str(), updates, &config.registry)?;
                                 repaired += 1;
                                 println!("  FIXED");

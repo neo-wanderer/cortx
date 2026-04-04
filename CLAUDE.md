@@ -53,7 +53,10 @@ cortx note insert-after-heading <id> --heading "..." --content "..."
 cortx note replace-block <id> --block-id <id> --content "..."
 cortx note read-lines <id> --start N --end M
 cortx doctor validate                                # Validate all files against schemas
-cortx doctor links                                   # Check for broken wiki links
+cortx doctor links [--fix]                           # Check bidirectional relation consistency; --fix auto-repairs
+cortx schema types [--format json]                   # List all entity types
+cortx schema show <type> [--format json]             # Show fields for a type
+cortx schema validate                                # Check ref integrity and relation consistency in types.yaml
 ```
 
 ## Query Language
@@ -108,7 +111,7 @@ These behaviors span multiple files and are easy to miss:
 - **Auto-populated fields**: `create` sets `created_at` and `updated_at` to today. `update` always overwrites `updated_at` with today. These happen in `storage/markdown.rs`, not the CLI layer.
 - **Default field values**: If the schema has a `status` field and no value is provided, `create` defaults it to `"open"`. Tags default to `[]`.
 - **Title resolution**: `Entity::title()` tries `title` field first, then `name`, then falls back to the entity ID. This allows different entity types to use either field.
-- **ID format**: `{entity_type}-{YYYYMMDD}-{uuid_first_8_chars}` (e.g., `task-20260403-a1b2c3d4`). Overridable with `--id`.
+- **ID format**: Slug derived from `--title` or `--name` (e.g., `"Buy groceries"` → `buy-groceries`). Override with `--id`. Unicode is transliterated to ASCII via `deunicode`, lowercased, non-alphanumeric runs replaced with hyphens. No date or UUID component in auto-generated IDs.
 - **Note block markers**: `replace-block` uses HTML comment markers: `<!-- block:id=NAME -->...<!-- /block:id=NAME -->`.
 - **Frontmatter serialization**: YAML keys are sorted alphabetically for deterministic file output. Format: `---\n{yaml}\n---\n{body}`.
 - **Query evaluation of missing fields**: Missing fields return `false` for all comparisons except `!=`, which returns `true`.

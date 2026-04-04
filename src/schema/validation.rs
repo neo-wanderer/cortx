@@ -20,9 +20,8 @@ use std::collections::HashMap;
 /// types:
 ///   task:
 ///     folder: "tasks"
-///     required: [id, type, status]
+///     required: [type, status]
 ///     fields:
-///       id:     { type: string }
 ///       type:   { const: task }
 ///       status: { enum: [open, done] }
 /// "#;
@@ -30,7 +29,6 @@ use std::collections::HashMap;
 /// let type_def = registry.get("task").unwrap();
 ///
 /// let mut fm = HashMap::new();
-/// fm.insert("id".into(), Value::String("t1".into()));
 /// fm.insert("type".into(), Value::String("task".into()));
 /// fm.insert("status".into(), Value::String("open".into()));
 /// assert!(validate_frontmatter(&fm, type_def).is_ok());

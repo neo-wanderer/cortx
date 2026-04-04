@@ -202,6 +202,7 @@ impl Repository for MarkdownRepository {
         }
 
         let content = serialize_entity(&frontmatter, body);
+        let _lock = file_lock::FileLock::acquire(&path)?;
         std::fs::write(&path, content)?;
 
         // Maintain bidirectional inverse fields

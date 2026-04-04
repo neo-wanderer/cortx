@@ -3,8 +3,8 @@ use crate::entity::Entity;
 use crate::error::{CortxError, Result};
 use crate::query::evaluator::evaluate;
 use crate::query::parser::parse_query;
-use crate::storage::Repository;
 use crate::storage::markdown::MarkdownRepository;
+use crate::storage::Repository;
 use crate::value::Value;
 use clap::Args;
 use std::cmp::Ordering;
@@ -129,7 +129,11 @@ fn compare_values(a: Option<&Value>, b: Option<&Value>, descending: bool) -> Ord
     match (a, b) {
         (Some(av), Some(bv)) => {
             let cmp = av.partial_cmp(bv).unwrap_or(Ordering::Equal);
-            if descending { cmp.reverse() } else { cmp }
+            if descending {
+                cmp.reverse()
+            } else {
+                cmp
+            }
         }
         (None, None) => Ordering::Equal,
         (Some(_), None) => Ordering::Less,    // Nulls to end
@@ -170,6 +174,7 @@ pub fn run(args: &QueryArgs, config: &Config) -> Result<()> {
             .iter()
             .map(|e| {
                 let mut map = serde_json::Map::new();
+                map.insert("id".into(), serde_json::Value::String(e.id.clone()));
                 for (k, v) in &e.frontmatter {
                     map.insert(k.clone(), serde_json::Value::String(v.to_string()));
                 }

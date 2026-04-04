@@ -357,9 +357,8 @@ fn test_init_custom_type_folder_created_on_write() {
     let custom_types = r#"types:
   recipe:
     folder: "6_Recipes"
-    required: [id, type, title]
+    required: [type, title]
     fields:
-      id:    { type: string }
       type:  { const: recipe }
       title: { type: string }
       tags:  { type: "array[string]", default: "[]" }
@@ -637,7 +636,8 @@ fn test_create_with_auto_generated_id() {
         .args(["create", "task", "--title", "Auto ID"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Created task-"));
+        .stdout(predicate::str::contains("Created auto-id"));
+    assert!(vault.file_exists("1_Projects/tasks/auto-id.md"));
 }
 
 #[test]
@@ -1627,12 +1627,10 @@ fn test_vault_name_flag_resolves_correct_vault() {
         .success()
         .stdout(predicate::str::contains("Created task-named-vault"));
     // Verify the file exists in the named vault
-    assert!(
-        vault_dir
-            .path()
-            .join("1_Projects/tasks/task-named-vault.md")
-            .exists()
-    );
+    assert!(vault_dir
+        .path()
+        .join("1_Projects/tasks/task-named-vault.md")
+        .exists());
 }
 
 #[test]
@@ -1733,7 +1731,7 @@ fn test_schema_show_json() {
     assert!(parsed["fields"].is_object());
     assert_eq!(parsed["fields"]["status"]["type"], "enum");
     assert!(parsed["fields"]["status"]["values"].is_array());
-    assert_eq!(parsed["fields"]["id"]["required"], true);
+    assert!(parsed["fields"]["title"].is_object());
 }
 
 #[test]
@@ -1791,4 +1789,52 @@ fn test_schema_types_custom_vault() {
         .filter_map(|v| v.as_str())
         .collect();
     assert_eq!(names, vec!["recipe"]);
+}
+
+#[test]
+fn test_create_slug_from_title() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Buy groceries"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Created buy-groceries"));
+    assert!(vault.file_exists("1_Projects/tasks/buy-groceries.md"));
+    let content = vault.read_file("1_Projects/tasks/buy-groceries.md");
+    assert!(
+        !content.contains("id:"),
+        "id must not appear in frontmatter"
+    );
+}
+
+#[test]
+fn test_create_collision_fails() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Buy groceries"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Buy groceries"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+}
+
+#[test]
+fn test_create_explicit_id_overrides_slug() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Buy groceries",
+            "--id",
+            "2026-04-04-buy-groceries",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Created 2026-04-04-buy-groceries"));
+    assert!(vault.file_exists("1_Projects/tasks/2026-04-04-buy-groceries.md"));
 }

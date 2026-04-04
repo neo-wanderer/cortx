@@ -1,9 +1,8 @@
 types:
   task:
     folder: "1_Projects/tasks"
-    required: [id, type, title, status]
+    required: [type, title, status]
     fields:
-      id:         { type: string }
       type:       { const: task }
       title:      { type: string }
       status:     { enum: [open, in_progress, waiting, done, cancelled, archived] }
@@ -18,9 +17,8 @@ types:
 
   project:
     folder: "1_Projects"
-    required: [id, type, title, status]
+    required: [type, title, status]
     fields:
-      id:         { type: string }
       type:       { const: project }
       title:      { type: string }
       status:     { enum: [active, on_hold, completed, cancelled, archived] }
@@ -33,9 +31,8 @@ types:
 
   area:
     folder: "2_Areas"
-    required: [id, type, title, status]
+    required: [type, title, status]
     fields:
-      id:         { type: string }
       type:       { const: area }
       title:      { type: string }
       status:     { enum: [active, archived] }
@@ -45,9 +42,8 @@ types:
 
   resource:
     folder: "3_Resources"
-    required: [id, type, title]
+    required: [type, title]
     fields:
-      id:         { type: string }
       type:       { const: resource }
       title:      { type: string }
       area:       { type: link, ref: area }
@@ -57,9 +53,8 @@ types:
 
   note:
     folder: "3_Resources/notes"
-    required: [id, type, title]
+    required: [type, title]
     fields:
-      id:         { type: string }
       type:       { const: note }
       title:      { type: string }
       area:       { type: link, ref: area }
@@ -69,9 +64,8 @@ types:
 
   person:
     folder: "5_People"
-    required: [id, type, name]
+    required: [type, name]
     fields:
-      id:           { type: string }
       type:         { const: person }
       name:         { type: string }
       relationship: { enum: [personal, professional, family, other] }
@@ -84,9 +78,8 @@ types:
 
   company:
     folder: "5_Companies"
-    required: [id, type, name]
+    required: [type, name]
     fields:
-      id:         { type: string }
       type:       { const: company }
       name:       { type: string }
       domain:     { type: string }

@@ -82,6 +82,7 @@ impl MarkdownRepository {
 impl Repository for MarkdownRepository {
     fn create(
         &self,
+        id: &str,
         frontmatter: HashMap<String, Value>,
         body: &str,
         registry: &TypeRegistry,
@@ -97,11 +98,6 @@ impl Repository for MarkdownRepository {
             .ok_or_else(|| CortxError::Schema(format!("unknown type '{type_name}'")))?;
 
         validate_frontmatter(&frontmatter, type_def)?;
-
-        let id = frontmatter
-            .get("id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| CortxError::Validation("missing 'id' field".into()))?;
 
         let path = self.resolve_path(&type_name, id, registry)?;
 

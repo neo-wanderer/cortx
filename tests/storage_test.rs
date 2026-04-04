@@ -2,9 +2,9 @@ mod common;
 
 use common::TestVault;
 use cortx::schema::registry::TypeRegistry;
-use cortx::storage::Repository;
 use cortx::storage::file_lock::FileLock;
 use cortx::storage::markdown::MarkdownRepository;
+use cortx::storage::Repository;
 use cortx::value::Value;
 use std::collections::HashMap;
 
@@ -25,7 +25,7 @@ fn test_create_entity() {
     fm.insert("status".into(), Value::String("open".into()));
     fm.insert("tags".into(), Value::Array(vec![]));
 
-    let entity = repo.create(fm, "", &registry).unwrap();
+    let entity = repo.create("task-001", fm, "", &registry).unwrap();
     assert_eq!(entity.id, "task-001");
     assert!(vault.file_exists("1_Projects/tasks/task-001.md"));
 }
@@ -182,9 +182,9 @@ fn test_create_duplicate_entity() {
     fm.insert("status".into(), Value::String("open".into()));
     fm.insert("tags".into(), Value::Array(vec![]));
 
-    repo.create(fm.clone(), "", &registry).unwrap();
+    repo.create("task-dup", fm.clone(), "", &registry).unwrap();
 
-    let err = repo.create(fm, "", &registry).unwrap_err();
+    let err = repo.create("task-dup", fm, "", &registry).unwrap_err();
     assert!(err.to_string().contains("already exists"));
 }
 

@@ -49,7 +49,101 @@ impl MarkdownRepository {
     fn read_entity(&self, path: &Path) -> Result<Entity> {
         let content = std::fs::read_to_string(path)?;
         let (fm, body) = parse_frontmatter(&content)?;
-        Ok(Entity::new(fm, body).with_path(path.to_path_buf()))
+        let id = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+        Ok(Entity::new(id, fm, body).with_path(path.to_path_buf()))
+    }
+
+    /// If `field_name` is a bidirectional link in the schema, update the inverse
+    /// field on the referenced entity. Acquires a lock on the ref file only.
+    fn apply_bidirectional(
+        &self,
+        owning_id: &str,
+        field_name: &str,
+        new_value: &Value,
+        registry: &TypeRegistry,
+        type_def: &crate::schema::types::TypeDefinition,
+    ) -> Result<()> {
+        use crate::schema::types::{FieldType, LinkTargets};
+
+        let field_def = match type_def.fields.get(field_name) {
+            Some(f) => f,
+            None => return Ok(()),
+        };
+
+        let link_def = match &field_def.field_type {
+            FieldType::Link(d) | FieldType::ArrayLink(d) if d.bidirectional => d,
+            _ => return Ok(()),
+        };
+
+        let ref_ids: Vec<String> = match new_value {
+            Value::String(s) if !s.is_empty() => vec![s.clone()],
+            Value::Array(items) => items
+                .iter()
+                .filter_map(|v| v.as_str().filter(|s| !s.is_empty()).map(|s| s.to_string()))
+                .collect(),
+            _ => return Ok(()),
+        };
+        if ref_ids.is_empty() {
+            return Ok(());
+        }
+
+        for ref_id in &ref_ids {
+            let (ref_type, inverse_field) = match &link_def.targets {
+                LinkTargets::Single {
+                    ref_type,
+                    inverse: Some(inv),
+                } => (ref_type.clone(), inv.clone()),
+                LinkTargets::Poly(targets) => {
+                    let matched = targets.iter().find_map(|t| {
+                        let ref_path = self.resolve_path(&t.ref_type, ref_id, registry).ok()?;
+                        if ref_path.exists() {
+                            t.inverse
+                                .as_deref()
+                                .map(|inv| (t.ref_type.clone(), inv.to_string()))
+                        } else {
+                            None
+                        }
+                    });
+                    match matched {
+                        Some((rt, inv)) => (rt, inv),
+                        None => continue,
+                    }
+                }
+                _ => continue,
+            };
+
+            let ref_path = self.resolve_path(&ref_type, ref_id, registry)?;
+            if !ref_path.exists() {
+                continue;
+            }
+
+            let _lock = file_lock::FileLock::acquire(&ref_path)?;
+
+            let ref_content = std::fs::read_to_string(&ref_path)?;
+            let (mut ref_fm, ref_body) = parse_frontmatter(&ref_content)?;
+
+            let arr = ref_fm
+                .entry(inverse_field)
+                .or_insert_with(|| Value::Array(vec![]));
+            if !matches!(arr, Value::Array(_)) {
+                *arr = Value::Array(vec![]);
+            }
+            if let Value::Array(items) = arr {
+                let id_val = Value::String(owning_id.to_string());
+                if !items.contains(&id_val) {
+                    items.push(id_val);
+                }
+            }
+
+            let updated = serialize_entity(&ref_fm, &ref_body);
+            std::fs::write(&ref_path, updated)?;
+        }
+
+        Ok(())
     }
 
     fn scan_folder(&self, folder: &Path) -> Result<Vec<Entity>> {
@@ -77,6 +171,7 @@ impl MarkdownRepository {
 impl Repository for MarkdownRepository {
     fn create(
         &self,
+        id: &str,
         frontmatter: HashMap<String, Value>,
         body: &str,
         registry: &TypeRegistry,
@@ -93,11 +188,6 @@ impl Repository for MarkdownRepository {
 
         validate_frontmatter(&frontmatter, type_def)?;
 
-        let id = frontmatter
-            .get("id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| CortxError::Validation("missing 'id' field".into()))?;
-
         let path = self.resolve_path(&type_name, id, registry)?;
 
         if path.exists() {
@@ -112,9 +202,15 @@ impl Repository for MarkdownRepository {
         }
 
         let content = serialize_entity(&frontmatter, body);
+        let _lock = file_lock::FileLock::acquire(&path)?;
         std::fs::write(&path, content)?;
 
-        Ok(Entity::new(frontmatter, body.to_string()).with_path(path))
+        // Maintain bidirectional inverse fields
+        for (field_name, value) in &frontmatter {
+            self.apply_bidirectional(id, field_name, value, registry, type_def)?;
+        }
+
+        Ok(Entity::new(id.to_string(), frontmatter, body.to_string()).with_path(path))
     }
 
     fn get_by_id(&self, id: &str, registry: &TypeRegistry) -> Result<Entity> {
@@ -135,6 +231,8 @@ impl Repository for MarkdownRepository {
 
         let mut entity = self.read_entity(&path)?;
 
+        let updates_snapshot = updates.clone();
+
         for (key, val) in updates {
             entity.frontmatter.insert(key, val);
         }
@@ -152,6 +250,14 @@ impl Repository for MarkdownRepository {
         std::fs::write(&path, content)?;
 
         lock.release()?;
+
+        // Maintain bidirectional inverse fields for link fields that changed
+        let type_def_for_bidir = registry.get(&entity.entity_type);
+        if let Some(type_def) = type_def_for_bidir {
+            for (field_name, value) in &updates_snapshot {
+                self.apply_bidirectional(id, field_name, value, registry, type_def)?;
+            }
+        }
 
         entity.file_path = Some(path);
         Ok(entity)

@@ -20,7 +20,9 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 4. Default vault from `~/.cortx/config.toml` (if set)
 5. Current working directory
 
-**Entity:** A Markdown file with YAML frontmatter (typed fields: `id`, `type`, `status`, `tags`, etc.) and a freeform body. The `type` field links the file to its schema in `types.yaml`.
+**Entity:** A Markdown file with YAML frontmatter (typed fields: `type`, `status`, `tags`, etc.) and a freeform body. The `type` field links the file to its schema in `types.yaml`. The entity ID is derived from the filename stem — it is **not** stored in frontmatter.
+
+**ID format:** Auto-generated as a slug derived from `--title` or `--name` (e.g., `"Buy groceries"` → `buy-groceries`). Unicode is transliterated to ASCII, lowercased, non-alphanumeric runs replaced with hyphens. Override with `--id`. If a slug collides with an existing file, the create command fails — use `--id` to specify a unique name.
 
 **Entity types (Second Brain vault):**
 
@@ -37,13 +39,11 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 | person | 5_People/ | name, relationship, company |
 | company | 5_Companies/ | name, domain, industry |
 
-**Links:** Entities reference each other via `link` fields (e.g., an entity's field holds another entity's ID). Soft references, not filesystem paths.
+**Links:** Entities reference each other via `link` fields (e.g., `goal: q2-planning`). The value is the ID (filename stem) of the referenced entity. Bidirectional link fields automatically update the inverse field on the referenced entity when a create or update is written.
 
 **Multi-vault config:** Named vaults are stored in `~/.cortx/config.toml`. Register a vault with `cortx init <path> --name <name>`. Select it with `--vault-name <name>`. The first registered vault becomes the default automatically.
 
 **Vault-specific types:** Each vault has its own `types.yaml`. Edit it to add, remove, or modify entity types for that vault. New type folders are auto-created on first write.
-
-**ID format:** Auto-generated as `<type>-<YYYYMMDD>-<8char-uuid>` if `--id` is omitted on create.
 
 ## Command Reference
 
@@ -80,14 +80,15 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 |---------|---------|-----------|
 | `cortx schema types` | List all entity types in the vault | `--format json` |
 | `cortx schema show <type>` | Show fields, types, required, defaults for a type | `--format json` |
+| `cortx schema validate` | Check `types.yaml` ref integrity and relation consistency | |
 
 **Maintenance:**
 
 | Command | Purpose |
 |---------|---------|
 | `cortx init [path] [--name <name>]` | Bootstrap vault and optionally register it |
-| `cortx doctor validate` | Validate against schemas |
-| `cortx doctor links` | Check broken wiki links |
+| `cortx doctor validate` | Validate all entity files against schemas |
+| `cortx doctor links [--fix]` | Check bidirectional relation consistency; `--fix` auto-repairs missing inverses |
 
 ## Query Language
 
@@ -115,16 +116,16 @@ Use `--sort-by` on `cortx query` to order results. Format: `field[:order][,field
 
 ```bash
 # Sort by a date field ascending (default)
-cortx query 'type = "widget" and status = "open"' --sort-by due
+cortx query 'type = "task" and status = "open"' --sort-by due
 
 # Sort descending
-cortx query 'type = "widget"' --sort-by due:desc
+cortx query 'type = "task"' --sort-by due:desc
 
 # Multi-field sort
-cortx query 'type = "widget" and status = "open"' --sort-by priority:asc,due:desc
+cortx query 'type = "task" and status = "open"' --sort-by priority:asc,due:desc
 
 # Quoted field names with spaces
-cortx query 'type = "widget"' --sort-by '"Due By":desc'
+cortx query 'type = "task"' --sort-by '"Due By":desc'
 ```
 
 **Null/missing values always sort to the end**, regardless of ascending or descending order.
@@ -133,17 +134,14 @@ cortx query 'type = "widget"' --sort-by '"Due By":desc'
 
 **Filter by type and status:**
 ```bash
-# Open entities with no linked parent
-cortx query 'type = "widget" and status = "open" and project = null'
-
 # Overdue (any entity with a due date field)
-cortx query 'type = "widget" and status != "done" and due < today'
+cortx query 'type = "task" and status != "done" and due < today'
 
 # Scheduled for today or earlier
-cortx query 'type = "widget" and status = "open" and scheduled <= today'
+cortx query 'type = "task" and status = "open" and scheduled <= today'
 
-# Entities linked to a specific parent
-cortx query 'type = "widget" and project = "proj-20260401-abc12345"'
+# Entities linked to a specific parent (use slug ID)
+cortx query 'type = "task" and goal = "q2-planning"'
 ```
 
 **Discovery:**
@@ -173,26 +171,26 @@ cortx query 'status = "open"' --sort-by priority:asc,due:asc
 **Aggregation:**
 ```bash
 # Distinct values for a field
-cortx meta distinct status --where 'type = "widget"'
+cortx meta distinct status --where 'type = "task"'
 
 # Entity count by type
 cortx meta count-by type
 
 # Entity count grouped by status
-cortx meta count-by status --where 'type = "widget"'
+cortx meta count-by status --where 'type = "task"'
 ```
 
 **Note editing:**
 ```bash
 # List headings in an entity's body
-cortx note headings widget-20260402-abc12345
+cortx note headings review-q2-goals
 
 # Insert content after a heading (heading text only, no markdown prefix)
-cortx note insert-after-heading widget-20260402-abc12345 \
+cortx note insert-after-heading review-q2-goals \
   --heading "Progress" --content "- Completed initial review"
 
 # Replace a named block
-cortx note replace-block widget-20260402-abc12345 \
+cortx note replace-block review-q2-goals \
   --block-id summary --content "Updated summary text"
 ```
 
@@ -203,22 +201,29 @@ cortx schema types
 cortx schema types --format json
 
 # Inspect a specific type's fields
-cortx schema show widget
-cortx schema show widget --format json
+cortx schema show task
+cortx schema show task --format json
+
+# Validate types.yaml for ref integrity and relation consistency
+cortx schema validate
 ```
 
 **CRUD flow:**
 ```bash
-# Create an entity with fields
-cortx create widget --title "Review PR" \
-  --set project=proj-20260401-abc12345 --set due=2026-04-05 \
+# Create an entity — ID is auto-generated as slug from title
+cortx create task --title "Review PR" \
+  --set goal=q2-planning --set due=2026-04-05 \
   --tags "urgent,review"
+# Creates: 1_Goals/tasks/review-pr.md with ID: review-pr
+
+# Override ID when you need a date prefix or disambiguation
+cortx create note --title "Meeting Notes" --id 2026-04-05-acme-kickoff
 
 # Update a field
-cortx update widget-20260402-abc12345 --set status=in_progress
+cortx update review-pr --set status=in_progress
 
 # Archive when done
-cortx archive widget-20260402-abc12345
+cortx archive review-pr
 ```
 
 **Goal management:**
@@ -226,24 +231,25 @@ cortx archive widget-20260402-abc12345
 # Create a time-bound goal
 cortx create goal --title "Launch v2.0" \
   --set type_val=goal --set kind=time-bound --set status=active \
-  --set area=area-20260404-abc12345 \
+  --set area=product \
   --set start_date=2026-04-01 --set end_date=2026-06-30 \
   --set priority=high
+# Creates: 1_Goals/launch-v2-0.md with ID: launch-v2-0
 
 # Create a milestone under a goal
 cortx create goal --title "Complete backend API" \
   --set type_val=milestone --set kind=time-bound \
-  --set up=goal-20260404-abc12345 \
+  --set up=launch-v2-0 \
   --set start_date=2026-04-01 --set end_date=2026-04-30
 
 # All active goals
 cortx query 'type = "goal" and status = "active"' --sort-by end_date:asc
 
 # All milestones for a goal
-cortx query 'type = "goal" and up = "goal-20260404-abc12345"'
+cortx query 'type = "goal" and up = "launch-v2-0"'
 
 # Tasks for a goal
-cortx query 'type = "task" and goal = "goal-20260404-abc12345"' --sort-by priority:desc
+cortx query 'type = "task" and goal = "launch-v2-0"' --sort-by priority:desc
 ```
 
 **Task inbox and state-based filtering:**
@@ -255,7 +261,7 @@ cortx create task --title "Call John about budget" --set status=inbox
 cortx query 'type = "task" and status = "inbox"'
 
 # Clarify: move to open with GTD fields
-cortx update task-20260404-abc12345 \
+cortx update call-john-about-budget \
   --set status=open --set context=computer --set state=flow --set priority=high
 
 # Quick wins (short tasks)
@@ -273,16 +279,25 @@ cortx query 'type = "task" and status = "open" and state = "easy" and energy = "
 # Record a decision
 cortx create log --title "Decided to migrate to Rust" \
   --set kind=decision --set date=2026-04-04 --set impact=positive \
-  --set goal=goal-20260404-abc12345
+  --set goal=launch-v2-0
 
 # Record a risk
 cortx create log --title "Key engineer may leave Q2" \
   --set kind=risk --set date=2026-04-04 --set impact=negative \
-  --set goal=goal-20260404-abc12345
+  --set goal=launch-v2-0
 
 # Timeline for a goal (chronological)
-cortx query 'type = "log" and goal = "goal-20260404-abc12345"' --sort-by date:asc
+cortx query 'type = "log" and goal = "launch-v2-0"' --sort-by date:asc
 
 # All decisions across vault
 cortx query 'type = "log" and kind = "decision"' --sort-by date:desc
+```
+
+**Relation maintenance:**
+```bash
+# Check for broken or missing bidirectional inverses
+cortx doctor links
+
+# Auto-repair missing inverses
+cortx doctor links --fix
 ```

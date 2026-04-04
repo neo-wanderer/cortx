@@ -283,7 +283,7 @@ fn test_note_headings_and_insert() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-test.md",
-        "---\nid: note-test\ntype: note\ntitle: Test Note\ntags: []\n---\n# Overview\n\nSome text.\n\n## Action Items\n\n- Item 1\n",
+        "---\ntype: note\ntitle: Test Note\ntags: []\n---\n# Overview\n\nSome text.\n\n## Action Items\n\n- Item 1\n",
     );
     cortx_cmd(&vault)
         .args(["note", "headings", "note-test"])
@@ -357,9 +357,8 @@ fn test_init_custom_type_folder_created_on_write() {
     let custom_types = r#"types:
   recipe:
     folder: "6_Recipes"
-    required: [id, type, title]
+    required: [type, title]
     fields:
-      id:    { type: string }
       type:  { const: recipe }
       title: { type: string }
       tags:  { type: "array[string]", default: "[]" }
@@ -427,37 +426,98 @@ fn test_doctor_links_no_broken() {
         .args(["doctor", "links"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("No broken links"));
+        .stdout(predicate::str::contains(
+            "No bidirectional relation inconsistencies found",
+        ));
 }
 
 #[test]
-fn test_doctor_links_finds_broken_in_body() {
+fn test_doctor_links_no_issues_when_inverse_present() {
     let vault = TestVault::new();
     vault.write_file(
-        "3_Resources/notes/note-links.md",
-        "---\nid: note-links\ntype: note\ntitle: Links test\ntags: []\n---\nSee [[nonexistent-entity]].\n",
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    vault.write_file(
+        "goals/q2-goals.md",
+        "---\ntype: goal\ntitle: Q2 Goals\ntasks:\n  - fix-login\ntags: []\n---\n",
+    );
+    vault.write_file(
+        "tasks/fix-login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
     );
     cortx_cmd(&vault)
         .args(["doctor", "links"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("BROKEN LINK"))
-        .stdout(predicate::str::contains("nonexistent-entity"));
+        .stdout(predicate::str::contains(
+            "No bidirectional relation inconsistencies found",
+        ));
 }
 
 #[test]
 fn test_doctor_links_finds_broken_in_frontmatter() {
     let vault = TestVault::new();
     vault.write_file(
-        "3_Resources/notes/note-fmlink.md",
-        "---\nid: note-fmlink\ntype: note\ntitle: FM Links\ntags: []\nref: '[[missing-ref]]'\n---\nBody.\n",
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    vault.write_file(
+        "goals/q2-goals.md",
+        "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
+    );
+    vault.write_file(
+        "tasks/fix-login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
     );
     cortx_cmd(&vault)
         .args(["doctor", "links"])
         .assert()
-        .success()
-        .stdout(predicate::str::contains("BROKEN LINK"))
-        .stdout(predicate::str::contains("missing-ref"));
+        .failure()
+        .stdout(predicate::str::contains("MISSING INVERSE"))
+        .stdout(predicate::str::contains("fix-login"));
 }
 
 #[test]
@@ -466,7 +526,7 @@ fn test_doctor_validate_with_errors() {
     // Write a task file missing required fields
     vault.write_file(
         "1_Projects/tasks/task-bad.md",
-        "---\nid: task-bad\ntype: task\n---\nBad task.\n",
+        "---\ntype: task\n---\nBad task.\n",
     );
     cortx_cmd(&vault)
         .args(["doctor", "validate"])
@@ -539,7 +599,7 @@ fn test_note_replace_block() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-block.md",
-        "---\nid: note-block\ntype: note\ntitle: Block test\ntags: []\n---\n# Content\n\n<!-- block:id=summary -->\nOld summary.\n<!-- /block:id=summary -->\n\nMore text.\n",
+        "---\ntype: note\ntitle: Block test\ntags: []\n---\n# Content\n\n<!-- block:id=summary -->\nOld summary.\n<!-- /block:id=summary -->\n\nMore text.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -566,7 +626,7 @@ fn test_note_read_lines() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-lines.md",
-        "---\nid: note-lines\ntype: note\ntitle: Lines test\ntags: []\n---\nLine one.\nLine two.\nLine three.\nLine four.\n",
+        "---\ntype: note\ntitle: Lines test\ntags: []\n---\nLine one.\nLine two.\nLine three.\nLine four.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -591,7 +651,7 @@ fn test_note_insert_after_heading_not_found() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-nohead.md",
-        "---\nid: note-nohead\ntype: note\ntitle: No Head\ntags: []\n---\nSome text.\n",
+        "---\ntype: note\ntitle: No Head\ntags: []\n---\nSome text.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -612,7 +672,7 @@ fn test_note_replace_block_not_found() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-noblock.md",
-        "---\nid: note-noblock\ntype: note\ntitle: No Block\ntags: []\n---\nSome text.\n",
+        "---\ntype: note\ntitle: No Block\ntags: []\n---\nSome text.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -637,7 +697,8 @@ fn test_create_with_auto_generated_id() {
         .args(["create", "task", "--title", "Auto ID"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Created task-"));
+        .stdout(predicate::str::contains("Created auto-id"));
+    assert!(vault.file_exists("1_Projects/tasks/auto-id.md"));
 }
 
 #[test]
@@ -733,7 +794,7 @@ fn test_show_with_body() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-body.md",
-        "---\nid: note-body\ntype: note\ntitle: Body test\ntags: []\n---\n# Important\n\nThis is the body.\n",
+        "---\ntype: note\ntitle: Body test\ntags: []\n---\n# Important\n\nThis is the body.\n",
     );
     cortx_cmd(&vault)
         .args(["show", "note-body"])
@@ -750,7 +811,7 @@ fn test_note_replace_block_missing_close_tag() {
     let vault = TestVault::new();
     vault.write_file(
         "3_Resources/notes/note-noclose.md",
-        "---\nid: note-noclose\ntype: note\ntitle: No Close\ntags: []\n---\n<!-- block:id=test -->\nContent here.\n",
+        "---\ntype: note\ntitle: No Close\ntags: []\n---\n<!-- block:id=test -->\nContent here.\n",
     );
     cortx_cmd(&vault)
         .args([
@@ -951,7 +1012,7 @@ fn test_query_quoted_field_name() {
     // Create entity with a field containing a space
     vault.write_file(
         "1_Projects/tasks/task-custom.md",
-        "---\nid: task-custom\ntype: task\ntitle: Custom Field Task\nstatus: open\nDue By: 2026-04-15\ntags: []\n---\nBody.\n",
+        "---\ntype: task\ntitle: Custom Field Task\nstatus: open\nDue By: 2026-04-15\ntags: []\n---\nBody.\n",
     );
     cortx_cmd(&vault)
         .args(["query", r#""Due By" = "2026-04-15""#])
@@ -1733,7 +1794,7 @@ fn test_schema_show_json() {
     assert!(parsed["fields"].is_object());
     assert_eq!(parsed["fields"]["status"]["type"], "enum");
     assert!(parsed["fields"]["status"]["values"].is_array());
-    assert_eq!(parsed["fields"]["id"]["required"], true);
+    assert!(parsed["fields"]["title"].is_object());
 }
 
 #[test]
@@ -1760,9 +1821,8 @@ fn test_schema_types_custom_vault() {
     let custom_types = r#"types:
   recipe:
     folder: "6_Recipes"
-    required: [id, type, title]
+    required: [type, title]
     fields:
-      id:    { type: string }
       type:  { const: recipe }
       title: { type: string }
 "#;
@@ -1791,4 +1851,355 @@ fn test_schema_types_custom_vault() {
         .filter_map(|v| v.as_str())
         .collect();
     assert_eq!(names, vec!["recipe"]);
+}
+
+#[test]
+fn test_create_slug_from_title() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Buy groceries"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Created buy-groceries"));
+    assert!(vault.file_exists("1_Projects/tasks/buy-groceries.md"));
+    let content = vault.read_file("1_Projects/tasks/buy-groceries.md");
+    assert!(
+        !content.contains("id:"),
+        "id must not appear in frontmatter"
+    );
+}
+
+#[test]
+fn test_create_collision_fails() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Buy groceries"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Buy groceries"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+}
+
+#[test]
+fn test_create_explicit_id_overrides_slug() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Buy groceries",
+            "--id",
+            "2026-04-04-buy-groceries",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Created 2026-04-04-buy-groceries"));
+    assert!(vault.file_exists("1_Projects/tasks/2026-04-04-buy-groceries.md"));
+}
+
+#[test]
+fn test_schema_validate_valid() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["schema", "validate"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("valid"));
+}
+
+#[test]
+fn test_schema_validate_detects_unknown_ref() {
+    let vault = TestVault::new();
+    // Write a types.yaml with a ref pointing to a nonexistent type
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  task:
+    folder: "1_Projects/tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: nonexistent_type
+        bidirectional: true
+        inverse: tasks
+"#,
+    );
+    let mut cmd = Command::cargo_bin("cortx").unwrap();
+    cmd.arg("--vault").arg(vault.path().to_str().unwrap());
+    cmd.args(["schema", "validate"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("nonexistent_type"));
+}
+
+#[test]
+fn test_schema_validate_detects_missing_inverse_field() {
+    let vault = TestVault::new();
+    // goal type doesn't have a 'tasks' field, but task.goal declares inverse: tasks
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+"#,
+    );
+    let mut cmd = Command::cargo_bin("cortx").unwrap();
+    cmd.arg("--vault").arg(vault.path().to_str().unwrap());
+    cmd.args(["schema", "validate"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("tasks"));
+}
+
+#[test]
+fn test_schema_validate_warns_inverse_one_on_array_link() {
+    let vault = TestVault::new();
+    // inverse_one: true on an array[link] field should produce a WARN but exit 0
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks:
+        type: "array[link]"
+        ref: task
+        bidirectional: true
+        inverse: goal
+        inverse_one: true
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+"#,
+    );
+    let mut cmd = Command::cargo_bin("cortx").unwrap();
+    cmd.arg("--vault").arg(vault.path().to_str().unwrap());
+    cmd.args(["schema", "validate"])
+        .assert()
+        .success() // warnings do not cause non-zero exit
+        .stdout(predicate::str::contains("WARN"));
+}
+
+#[test]
+fn test_bidirectional_create_updates_inverse() {
+    let vault = TestVault::new();
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    cortx_cmd(&vault)
+        .args(["create", "goal", "--title", "Q2 Goals"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "task",
+            "--title",
+            "Fix login bug",
+            "--set",
+            "goal=q2-goals",
+        ])
+        .assert()
+        .success();
+    let goal_content = vault.read_file("goals/q2-goals.md");
+    assert!(
+        goal_content.contains("fix-login-bug"),
+        "goal.tasks should contain the new task id: {goal_content}"
+    );
+}
+
+#[test]
+fn test_bidirectional_update_adds_to_inverse() {
+    let vault = TestVault::new();
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    cortx_cmd(&vault)
+        .args(["create", "goal", "--title", "Q2 Goals"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Fix login bug"])
+        .assert()
+        .success();
+    cortx_cmd(&vault)
+        .args(["update", "fix-login-bug", "--set", "goal=q2-goals"])
+        .assert()
+        .success();
+    let goal_content = vault.read_file("goals/q2-goals.md");
+    assert!(
+        goal_content.contains("fix-login-bug"),
+        "goal.tasks should contain the task after update: {goal_content}"
+    );
+}
+
+#[test]
+fn test_doctor_links_detects_missing_inverse() {
+    let vault = TestVault::new();
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    vault.write_file(
+        "goals/q2-goals.md",
+        "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
+    );
+    vault.write_file(
+        "tasks/fix-login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
+    );
+
+    cortx_cmd(&vault)
+        .args(["doctor", "links"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("fix-login"))
+        .stdout(predicate::str::contains("MISSING INVERSE"));
+}
+
+#[test]
+fn test_doctor_links_fix_repairs_inverse() {
+    let vault = TestVault::new();
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task }
+      tags:  { type: "array[string]", default: "[]" }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+      tags:  { type: "array[string]", default: "[]" }
+"#,
+    );
+    vault.write_file(
+        "goals/q2-goals.md",
+        "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
+    );
+    vault.write_file(
+        "tasks/fix-login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
+    );
+
+    cortx_cmd(&vault)
+        .args(["doctor", "links", "--fix"])
+        .assert()
+        .success();
+
+    let goal_content = vault.read_file("goals/q2-goals.md");
+    assert!(
+        goal_content.contains("fix-login"),
+        "goal.tasks should contain fix-login after --fix: {goal_content}"
+    );
 }

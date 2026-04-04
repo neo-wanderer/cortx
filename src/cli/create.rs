@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::error::Result;
+use crate::slug::to_slug;
 use crate::storage::Repository;
 use crate::storage::markdown::MarkdownRepository;
 use crate::value::Value;
@@ -31,14 +32,6 @@ pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
     let repo = MarkdownRepository::new(config.vault_path.clone());
 
     let mut fm = HashMap::new();
-
-    let id = args.id.clone().unwrap_or_else(|| {
-        let today = chrono::Local::now().format("%Y%m%d");
-        let short = &uuid::Uuid::new_v4().to_string()[..8];
-        format!("{}-{today}-{short}", args.entity_type)
-    });
-
-    fm.insert("id".into(), Value::String(id.clone()));
     fm.insert("type".into(), Value::String(args.entity_type.clone()));
 
     if let Some(title) = &args.title {
@@ -47,6 +40,18 @@ pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
     if let Some(name) = &args.name {
         fm.insert("name".into(), Value::String(name.clone()));
     }
+
+    // Determine id: explicit --id flag takes priority, else slug from title/name/type
+    let id = if let Some(explicit) = &args.id {
+        explicit.clone()
+    } else {
+        let base = args
+            .title
+            .as_deref()
+            .or(args.name.as_deref())
+            .unwrap_or(&args.entity_type);
+        to_slug(base)
+    };
 
     if let Some(type_def) = config.registry.get(&args.entity_type)
         && type_def.fields.contains_key("status")
@@ -76,7 +81,7 @@ pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
     fm.insert("created_at".into(), Value::Date(today));
     fm.insert("updated_at".into(), Value::Date(today));
 
-    let entity = repo.create(fm, "", &config.registry)?;
+    let entity = repo.create(&id, fm, "", &config.registry)?;
     println!("Created {} ({})", entity.id, entity.entity_type);
     if let Some(path) = &entity.file_path {
         println!("  File: {}", path.display());

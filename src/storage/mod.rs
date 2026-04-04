@@ -15,6 +15,7 @@ use std::collections::HashMap;
 pub trait Repository {
     fn create(
         &self,
+        id: &str,
         frontmatter: HashMap<String, Value>,
         body: &str,
         registry: &TypeRegistry,

@@ -20,9 +20,8 @@ use std::collections::HashMap;
 /// types:
 ///   task:
 ///     folder: "tasks"
-///     required: [id, type, status]
+///     required: [type, status]
 ///     fields:
-///       id:     { type: string }
 ///       type:   { const: task }
 ///       status: { enum: [open, done] }
 /// "#;
@@ -30,7 +29,6 @@ use std::collections::HashMap;
 /// let type_def = registry.get("task").unwrap();
 ///
 /// let mut fm = HashMap::new();
-/// fm.insert("id".into(), Value::String("t1".into()));
 /// fm.insert("type".into(), Value::String("task".into()));
 /// fm.insert("status".into(), Value::String("open".into()));
 /// assert!(validate_frontmatter(&fm, type_def).is_ok());
@@ -102,8 +100,11 @@ pub fn validate_frontmatter(
                         errors.push(format!("field '{field_name}' must be a number"));
                     }
                 }
-                FieldType::String | FieldType::Link { .. } | FieldType::Datetime => {
-                    // String-like fields accept any string value
+                FieldType::String
+                | FieldType::Link(_)
+                | FieldType::ArrayLink(_)
+                | FieldType::Datetime => {
+                    // String-like fields; link refs are string IDs — no value-level validation here
                 }
             }
         }

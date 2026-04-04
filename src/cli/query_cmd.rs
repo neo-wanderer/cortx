@@ -170,6 +170,7 @@ pub fn run(args: &QueryArgs, config: &Config) -> Result<()> {
             .iter()
             .map(|e| {
                 let mut map = serde_json::Map::new();
+                map.insert("id".into(), serde_json::Value::String(e.id.clone()));
                 for (k, v) in &e.frontmatter {
                     map.insert(k.clone(), serde_json::Value::String(v.to_string()));
                 }

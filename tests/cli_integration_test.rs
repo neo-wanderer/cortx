@@ -325,10 +325,9 @@ fn test_init_creates_vault_structure() {
     assert!(vault_path.join("0_Inbox").exists());
     assert!(vault_path.join("4_Archive").exists());
     // All type folders from types.yaml are created
-    let registry = cortx::schema::registry::TypeRegistry::from_yaml_file(
-        &vault_path.join("types.yaml"),
-    )
-    .unwrap();
+    let registry =
+        cortx::schema::registry::TypeRegistry::from_yaml_file(&vault_path.join("types.yaml"))
+            .unwrap();
     for type_name in registry.type_names() {
         let def = registry.get(type_name).unwrap();
         if !def.folder.is_empty() {
@@ -1689,7 +1688,9 @@ fn test_schema_types_json() {
         .clone();
     let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
     assert!(parsed.is_array());
-    let names: Vec<&str> = parsed.as_array().unwrap()
+    let names: Vec<&str> = parsed
+        .as_array()
+        .unwrap()
         .iter()
         .filter_map(|v| v.as_str())
         .collect();
@@ -1769,14 +1770,23 @@ fn test_schema_types_custom_vault() {
 
     let output = Command::cargo_bin("cortx")
         .unwrap()
-        .args(["--vault", vault_path.to_str().unwrap(), "schema", "types", "--format", "json"])
+        .args([
+            "--vault",
+            vault_path.to_str().unwrap(),
+            "schema",
+            "types",
+            "--format",
+            "json",
+        ])
         .assert()
         .success()
         .get_output()
         .stdout
         .clone();
     let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let names: Vec<&str> = parsed.as_array().unwrap()
+    let names: Vec<&str> = parsed
+        .as_array()
+        .unwrap()
         .iter()
         .filter_map(|v| v.as_str())
         .collect();

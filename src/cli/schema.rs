@@ -46,8 +46,10 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
             names.sort_unstable();
 
             if format == "json" {
-                let arr: Vec<serde_json::Value> =
-                    names.iter().map(|n| serde_json::Value::String(n.to_string())).collect();
+                let arr: Vec<serde_json::Value> = names
+                    .iter()
+                    .map(|n| serde_json::Value::String(n.to_string()))
+                    .collect();
                 println!("{}", serde_json::to_string_pretty(&arr).unwrap_or_default());
             } else {
                 println!("Types ({}):\n", names.len());
@@ -99,17 +101,11 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
                             }
                         }
                         _ => {
-                            obj.insert(
-                                "type".into(),
-                                serde_json::Value::String(type_str),
-                            );
+                            obj.insert("type".into(), serde_json::Value::String(type_str));
                         }
                     }
 
-                    obj.insert(
-                        "required".into(),
-                        serde_json::Value::Bool(field.required),
-                    );
+                    obj.insert("required".into(), serde_json::Value::Bool(field.required));
                     if let Some(d) = &field.default {
                         obj.insert("default".into(), serde_json::Value::String(d.clone()));
                     }
@@ -129,7 +125,12 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
                 let mut field_names: Vec<&str> = def.fields.keys().map(|s| s.as_str()).collect();
                 field_names.sort_unstable();
 
-                let col1 = field_names.iter().map(|n| n.len()).max().unwrap_or(5).max(5);
+                let col1 = field_names
+                    .iter()
+                    .map(|n| n.len())
+                    .max()
+                    .unwrap_or(5)
+                    .max(5);
                 let col2 = field_names
                     .iter()
                     .map(|n| field_type_str(&def.fields[*n].field_type).len())
@@ -139,7 +140,10 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
 
                 println!(
                     "{:<col1$}  {:<col2$}  REQUIRED  DEFAULT",
-                    "FIELD", "TYPE", col1 = col1, col2 = col2
+                    "FIELD",
+                    "TYPE",
+                    col1 = col1,
+                    col2 = col2
                 );
                 println!("{}", "-".repeat(col1 + col2 + 22));
 
@@ -150,8 +154,12 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
                     let default = field.default.as_deref().unwrap_or("");
                     println!(
                         "{:<col1$}  {:<col2$}  {:<8}  {}",
-                        field_name, type_str, required, default,
-                        col1 = col1, col2 = col2
+                        field_name,
+                        type_str,
+                        required,
+                        default,
+                        col1 = col1,
+                        col2 = col2
                     );
                 }
             }

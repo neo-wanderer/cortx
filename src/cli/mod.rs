@@ -6,6 +6,7 @@ pub mod init;
 pub mod meta;
 pub mod note;
 pub mod query_cmd;
+pub mod schema;
 pub mod show;
 pub mod update;
 
@@ -52,4 +53,6 @@ pub enum Commands {
     Note(note::NoteArgs),
     /// Doctor / lint commands
     Doctor(doctor::DoctorArgs),
+    /// Inspect types and field schemas
+    Schema(schema::SchemaArgs),
 }

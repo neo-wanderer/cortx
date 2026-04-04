@@ -1,17 +1,17 @@
 ---
 name: using-cortx-cli
-description: Use when managing Second Brain entities (tasks, projects, people, notes) through the cortx CLI — creating, querying, updating, or editing vault contents
+description: Use when managing Second Brain entities through the cortx CLI — creating, querying, updating, or editing vault contents
 ---
 
 # Using the cortx CLI
 
 ## Overview
 
-cortx is a schema-driven CLI that stores entities as Markdown files with YAML frontmatter. All entity types (task, project, person, company, note, area, resource) are defined in `types.yaml` and share the same generic commands — no type-specific subcommands.
+cortx is a schema-driven CLI that stores entities as Markdown files with YAML frontmatter. Entity types are defined per-vault in `types.yaml` — all share the same generic commands with no type-specific subcommands.
 
 ## Mental Model
 
-**Vault:** A directory with entity files in type-specific folders (e.g., `1_Projects/tasks/`, `5_People/`). Folder mapping comes from `types.yaml`.
+**Vault:** A directory with entity files in type-specific folders. Each type's folder is defined in `types.yaml`.
 
 **Vault resolution order (highest to lowest priority):**
 1. `--vault <path>` — explicit path
@@ -20,11 +20,13 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 4. Default vault from `~/.cortx/config.toml` (if set)
 5. Current working directory
 
-**Entity:** A Markdown file with YAML frontmatter (typed fields: `id`, `type`, `status`, `tags`, etc.) and a freeform body. The `type` field links the file to its schema.
+**Entity:** A Markdown file with YAML frontmatter (typed fields: `id`, `type`, `status`, `tags`, etc.) and a freeform body. The `type` field links the file to its schema in `types.yaml`.
 
-**Links:** Entities reference each other via `link` fields (e.g., a task's `project` field holds a project ID). Soft references, not filesystem paths.
+**Links:** Entities reference each other via `link` fields (e.g., an entity's field holds another entity's ID). Soft references, not filesystem paths.
 
 **Multi-vault config:** Named vaults are stored in `~/.cortx/config.toml`. Register a vault with `cortx init <path> --name <name>`. Select it with `--vault-name <name>`. The first registered vault becomes the default automatically.
+
+**Vault-specific types:** Each vault has its own `types.yaml`. Edit it to add, remove, or modify entity types for that vault. New type folders are auto-created on first write.
 
 **ID format:** Auto-generated as `<type>-<YYYYMMDD>-<8char-uuid>` if `--id` is omitted on create.
 
@@ -56,6 +58,13 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 | `cortx note insert-after-heading <id>` | Insert after heading | `--heading`, `--content` |
 | `cortx note replace-block <id>` | Replace named block | `--block-id`, `--content` |
 | `cortx note read-lines <id>` | Read line range | `--start`, `--end` |
+
+**Schema Introspection:**
+
+| Command | Purpose | Key Flags |
+|---------|---------|-----------|
+| `cortx schema types` | List all entity types in the vault | `--format json` |
+| `cortx schema show <type>` | Show fields, types, required, defaults for a type | `--format json` |
 
 **Maintenance:**
 
@@ -90,95 +99,109 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 Use `--sort-by` on `cortx query` to order results. Format: `field[:order][,field[:order]...]`. Order defaults to `asc`.
 
 ```bash
-# Sort by due date ascending (default)
-cortx query 'type = "task" and status = "open"' --sort-by due
+# Sort by a date field ascending (default)
+cortx query 'type = "widget" and status = "open"' --sort-by due
 
-# Sort by due date descending
-cortx query 'type = "task"' --sort-by due:desc
+# Sort descending
+cortx query 'type = "widget"' --sort-by due:desc
 
-# Multi-field sort: priority ascending, then due date descending
-cortx query 'type = "task" and status = "open"' --sort-by priority:asc,due:desc
+# Multi-field sort
+cortx query 'type = "widget" and status = "open"' --sort-by priority:asc,due:desc
 
 # Quoted field names with spaces
-cortx query 'type = "task"' --sort-by '"Due By":desc'
+cortx query 'type = "widget"' --sort-by '"Due By":desc'
 ```
 
 **Null/missing values always sort to the end**, regardless of ascending or descending order.
 
 ## Recipes
 
-**Task management:**
+**Filter by type and status:**
 ```bash
-# Inbox (unassigned open tasks)
-cortx query 'type = "task" and status = "open" and project = null'
+# Open entities with no linked parent
+cortx query 'type = "widget" and status = "open" and project = null'
 
-# Overdue tasks
-cortx query 'type = "task" and status != "done" and due < today'
+# Overdue (any entity with a due date field)
+cortx query 'type = "widget" and status != "done" and due < today'
 
-# Today's scheduled work
-cortx query 'type = "task" and status = "open" and scheduled <= today'
+# Scheduled for today or earlier
+cortx query 'type = "widget" and status = "open" and scheduled <= today'
 
-# Tasks for a specific project
-cortx query 'type = "task" and project = "proj-website-redesign"'
+# Entities linked to a specific parent
+cortx query 'type = "widget" and project = "proj-20260401-abc12345"'
 ```
 
 **Discovery:**
 ```bash
-# People tagged "founder"
-cortx query 'type = "person" and tags contains "founder"'
+# Entities with a specific tag
+cortx query 'tags contains "urgent"'
 
-# Notes created this month
-cortx query 'type = "note" and created_at >= "2026-04-01"'
+# Entities created this month
+cortx query 'created_at >= "2026-04-01"'
 
-# Full-text search
+# Full-text search across all entity bodies
 cortx query 'text ~ "quarterly review"'
+
+# Entities of any type with a specific status
+cortx query 'status = "open"'
 ```
 
 **Sorted queries:**
 ```bash
-# Overdue tasks sorted by due date (oldest first)
-cortx query 'type = "task" and status != "done" and due < today' --sort-by due:asc
+# Overdue entities sorted by due date (oldest first)
+cortx query 'status != "done" and due < today' --sort-by due:asc
 
-# Open tasks sorted by priority then due date
-cortx query 'type = "task" and status = "open"' --sort-by priority:asc,due:asc
+# Entities sorted by priority then due date
+cortx query 'status = "open"' --sort-by priority:asc,due:asc
 ```
 
 **Aggregation:**
 ```bash
-# Distinct statuses for tasks
-cortx meta distinct status --where 'type = "task"'
+# Distinct values for a field
+cortx meta distinct status --where 'type = "widget"'
 
 # Entity count by type
 cortx meta count-by type
 
-# Task count by status
-cortx meta count-by status --where 'type = "task"'
+# Entity count grouped by status
+cortx meta count-by status --where 'type = "widget"'
 ```
 
 **Note editing:**
 ```bash
-# List headings in a note's body
-cortx note headings task-20260402-abc12345
+# List headings in an entity's body
+cortx note headings widget-20260402-abc12345
 
 # Insert content after a heading (heading text only, no markdown prefix)
-cortx note insert-after-heading task-20260402-abc12345 \
+cortx note insert-after-heading widget-20260402-abc12345 \
   --heading "Progress" --content "- Completed initial review"
 
 # Replace a named block
-cortx note replace-block task-20260402-abc12345 \
+cortx note replace-block widget-20260402-abc12345 \
   --block-id summary --content "Updated summary text"
+```
+
+**Schema introspection (for agents discovering vault types):**
+```bash
+# List all types in the vault
+cortx schema types
+cortx schema types --format json
+
+# Inspect a specific type's fields
+cortx schema show widget
+cortx schema show widget --format json
 ```
 
 **CRUD flow:**
 ```bash
-# Create task linked to project
-cortx create task --title "Review PR" \
-  --set project=proj-website-redesign --set due=2026-04-05 \
+# Create an entity with fields
+cortx create widget --title "Review PR" \
+  --set project=proj-20260401-abc12345 --set due=2026-04-05 \
   --tags "urgent,review"
 
-# Update status
-cortx update task-20260402-abc12345 --set status=in_progress
+# Update a field
+cortx update widget-20260402-abc12345 --set status=in_progress
 
 # Archive when done
-cortx archive task-20260402-abc12345
+cortx archive widget-20260402-abc12345
 ```

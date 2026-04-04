@@ -320,12 +320,73 @@ fn test_init_creates_vault_structure() {
         .success()
         .stdout(predicate::str::contains("Initialized cortx vault"));
 
-    assert!(vault_path.join("0_Inbox").exists());
-    assert!(vault_path.join("1_Projects/tasks").exists());
-    assert!(vault_path.join("3_Resources/notes").exists());
-    assert!(vault_path.join("5_People").exists());
-    assert!(vault_path.join("5_Companies").exists());
     assert!(vault_path.join("types.yaml").exists());
+    // Structural PARA folders always created
+    assert!(vault_path.join("0_Inbox").exists());
+    assert!(vault_path.join("4_Archive").exists());
+    // All type folders from types.yaml are created
+    let registry =
+        cortx::schema::registry::TypeRegistry::from_yaml_file(&vault_path.join("types.yaml"))
+            .unwrap();
+    for type_name in registry.type_names() {
+        let def = registry.get(type_name).unwrap();
+        if !def.folder.is_empty() {
+            assert!(
+                vault_path.join(&def.folder).exists(),
+                "folder '{}' for type '{}' was not created",
+                def.folder,
+                type_name
+            );
+        }
+    }
+}
+
+#[test]
+fn test_init_custom_type_folder_created_on_write() {
+    // Verify that a type with a custom folder defined in types.yaml
+    // gets its folder auto-created when the first entity is written.
+    let tmp = TempDir::new().unwrap();
+    let vault_path = tmp.path().join("custom_vault");
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .args(["init", vault_path.to_str().unwrap()])
+        .assert()
+        .success();
+
+    // Add a custom type to the vault's types.yaml
+    let custom_types = r#"types:
+  recipe:
+    folder: "6_Recipes"
+    required: [id, type, title]
+    fields:
+      id:    { type: string }
+      type:  { const: recipe }
+      title: { type: string }
+      tags:  { type: "array[string]", default: "[]" }
+"#;
+    fs::write(vault_path.join("types.yaml"), custom_types).unwrap();
+
+    // The folder should not exist yet
+    assert!(!vault_path.join("6_Recipes").exists());
+
+    // Creating an entity of the new type should auto-create the folder
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .args([
+            "--vault",
+            vault_path.to_str().unwrap(),
+            "create",
+            "recipe",
+            "--title",
+            "Pasta",
+            "--id",
+            "recipe-pasta",
+        ])
+        .assert()
+        .success();
+
+    assert!(vault_path.join("6_Recipes").exists());
+    assert!(vault_path.join("6_Recipes/recipe-pasta.md").exists());
 }
 
 #[test]
@@ -1600,4 +1661,134 @@ fn test_init_without_name_skips_global_config() {
         .success();
     // No config file should be created when --name is not provided
     assert!(!dir.path().join(".cortx").join("config.toml").exists());
+}
+
+#[test]
+fn test_schema_types_text() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["schema", "types"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Types ("))
+        .stdout(predicate::str::contains("task"))
+        .stdout(predicate::str::contains("project"))
+        .stdout(predicate::str::contains("folder:"));
+}
+
+#[test]
+fn test_schema_types_json() {
+    let vault = TestVault::new();
+    let output = cortx_cmd(&vault)
+        .args(["schema", "types", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert!(parsed.is_array());
+    let names: Vec<&str> = parsed
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    assert!(names.contains(&"task"));
+    assert!(names.contains(&"project"));
+    // Should be sorted
+    let mut sorted = names.clone();
+    sorted.sort_unstable();
+    assert_eq!(names, sorted);
+}
+
+#[test]
+fn test_schema_show_text() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["schema", "show", "task"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Type:   task"))
+        .stdout(predicate::str::contains("Folder:"))
+        .stdout(predicate::str::contains("FIELD"))
+        .stdout(predicate::str::contains("TYPE"))
+        .stdout(predicate::str::contains("status"))
+        .stdout(predicate::str::contains("enum["));
+}
+
+#[test]
+fn test_schema_show_json() {
+    let vault = TestVault::new();
+    let output = cortx_cmd(&vault)
+        .args(["schema", "show", "task", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(parsed["name"], "task");
+    assert!(parsed["folder"].is_string());
+    assert!(parsed["fields"].is_object());
+    assert_eq!(parsed["fields"]["status"]["type"], "enum");
+    assert!(parsed["fields"]["status"]["values"].is_array());
+    assert_eq!(parsed["fields"]["id"]["required"], true);
+}
+
+#[test]
+fn test_schema_show_unknown_type() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["schema", "show", "nonexistent"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown type 'nonexistent'"));
+}
+
+#[test]
+fn test_schema_types_custom_vault() {
+    // A vault with a custom types.yaml shows only its own types
+    let tmp = TempDir::new().unwrap();
+    let vault_path = tmp.path().join("custom");
+    Command::cargo_bin("cortx")
+        .unwrap()
+        .args(["init", vault_path.to_str().unwrap()])
+        .assert()
+        .success();
+
+    let custom_types = r#"types:
+  recipe:
+    folder: "6_Recipes"
+    required: [id, type, title]
+    fields:
+      id:    { type: string }
+      type:  { const: recipe }
+      title: { type: string }
+"#;
+    fs::write(vault_path.join("types.yaml"), custom_types).unwrap();
+
+    let output = Command::cargo_bin("cortx")
+        .unwrap()
+        .args([
+            "--vault",
+            vault_path.to_str().unwrap(),
+            "schema",
+            "types",
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let names: Vec<&str> = parsed
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    assert_eq!(names, vec!["recipe"]);
 }

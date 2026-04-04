@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-04-04
+
+### Documentation
+
+- Update changelog for v0.4.0
+
+### Features
+
+- JARVIS Second Brain skills and OpenWolf integration (#4)
+- Schema relations, slug filenames, schema validate, doctor links --fix (#5)
+
+### Miscellaneous
+
+- Add pre-commit clippy hook and auto-format on edit
+
 ## [0.4.0] - 2026-04-04
 
 ### Features

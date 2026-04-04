@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-04-04
+
+### Features
+
+- Vault-specific types and schema introspection command (#3)
+
+### Miscellaneous
+
+- Bump version to v0.3.0 and automate version bump in release workflow
+- Add release.sh script and simplify release workflow
+- Bump version to v0.4.0
+
+## [0.3.0] - 2026-04-03
+
+### Documentation
+
+- Update changelog for v0.2.0
+
+### Features
+
+- Global config and multi-vault support (#2)
+
 ## [0.2.0] - 2026-04-03
 
 ### Documentation

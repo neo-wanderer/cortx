@@ -22,6 +22,21 @@ cortx is a schema-driven CLI that stores entities as Markdown files with YAML fr
 
 **Entity:** A Markdown file with YAML frontmatter (typed fields: `id`, `type`, `status`, `tags`, etc.) and a freeform body. The `type` field links the file to its schema in `types.yaml`.
 
+**Entity types (Second Brain vault):**
+
+> **Schema dependency:** `goal` and `log` are new types requiring an updated `types.yaml`. The `inbox` task status and fields like `state`, `context`, `energy`, `goal` also require the updated schema. Run `cortx schema types` to verify what's available before using these types.
+
+| Type | Folder | Key fields |
+|---|---|---|
+| area | 2_Areas/ | title, up, archived |
+| goal | 1_Goals/ | title, type_val [goal/milestone], kind [time-bound/ongoing], status, area, priority |
+| task | 1_Goals/tasks/ | title, status (default: open — use `--set status=inbox` to capture), goal, priority, state [easy/quick/flow] |
+| note | 3_Resources/notes/ | title, kind, status, area, goal |
+| resource | 3_Resources/ | title, kind, ref, area, goal |
+| log | 4_Logs/ | title, date, kind, impact, goal |
+| person | 5_People/ | name, relationship, company |
+| company | 5_Companies/ | name, domain, industry |
+
 **Links:** Entities reference each other via `link` fields (e.g., an entity's field holds another entity's ID). Soft references, not filesystem paths.
 
 **Multi-vault config:** Named vaults are stored in `~/.cortx/config.toml`. Register a vault with `cortx init <path> --name <name>`. Select it with `--vault-name <name>`. The first registered vault becomes the default automatically.
@@ -204,4 +219,70 @@ cortx update widget-20260402-abc12345 --set status=in_progress
 
 # Archive when done
 cortx archive widget-20260402-abc12345
+```
+
+**Goal management:**
+```bash
+# Create a time-bound goal
+cortx create goal --title "Launch v2.0" \
+  --set type_val=goal --set kind=time-bound --set status=active \
+  --set area=area-20260404-abc12345 \
+  --set start_date=2026-04-01 --set end_date=2026-06-30 \
+  --set priority=high
+
+# Create a milestone under a goal
+cortx create goal --title "Complete backend API" \
+  --set type_val=milestone --set kind=time-bound \
+  --set up=goal-20260404-abc12345 \
+  --set start_date=2026-04-01 --set end_date=2026-04-30
+
+# All active goals
+cortx query 'type = "goal" and status = "active"' --sort-by end_date:asc
+
+# All milestones for a goal
+cortx query 'type = "goal" and up = "goal-20260404-abc12345"'
+
+# Tasks for a goal
+cortx query 'type = "task" and goal = "goal-20260404-abc12345"' --sort-by priority:desc
+```
+
+**Task inbox and state-based filtering:**
+```bash
+# Capture to inbox (must be explicit — default status is "open")
+cortx create task --title "Call John about budget" --set status=inbox
+
+# View inbox (unclarified tasks)
+cortx query 'type = "task" and status = "inbox"'
+
+# Clarify: move to open with GTD fields
+cortx update task-20260404-abc12345 \
+  --set status=open --set context=computer --set state=flow --set priority=high
+
+# Quick wins (short tasks)
+cortx query 'type = "task" and status = "open" and state = "quick"' --sort-by duration:asc
+
+# Deep focus tasks
+cortx query 'type = "task" and status = "open" and state = "flow"' --sort-by priority:desc
+
+# Low energy tasks at home
+cortx query 'type = "task" and status = "open" and state = "easy" and energy = "low" and context = "home"'
+```
+
+**Log / timeline recipes:**
+```bash
+# Record a decision
+cortx create log --title "Decided to migrate to Rust" \
+  --set kind=decision --set date=2026-04-04 --set impact=positive \
+  --set goal=goal-20260404-abc12345
+
+# Record a risk
+cortx create log --title "Key engineer may leave Q2" \
+  --set kind=risk --set date=2026-04-04 --set impact=negative \
+  --set goal=goal-20260404-abc12345
+
+# Timeline for a goal (chronological)
+cortx query 'type = "log" and goal = "goal-20260404-abc12345"' --sort-by date:asc
+
+# All decisions across vault
+cortx query 'type = "log" and kind = "decision"' --sort-by date:desc
 ```

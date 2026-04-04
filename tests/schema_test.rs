@@ -10,9 +10,8 @@ fn test_load_types_yaml() {
 types:
   task:
     folder: "1_Projects/tasks"
-    required: [id, type, title, status]
+    required: [type, title, status]
     fields:
-      id:       { type: string }
       type:     { const: task }
       title:    { type: string }
       status:   { enum: [open, in_progress, waiting, done, cancelled] }
@@ -30,9 +29,8 @@ fn test_type_definition_fields() {
 types:
   task:
     folder: "tasks"
-    required: [id, type, title, status]
+    required: [type, title, status]
     fields:
-      id:       { type: string }
       type:     { const: task }
       title:    { type: string }
       status:   { enum: [open, in_progress, done] }
@@ -42,7 +40,7 @@ types:
     let registry = TypeRegistry::from_yaml_str(yaml).unwrap();
     let task_def = registry.get("task").unwrap();
     assert_eq!(task_def.folder, "tasks");
-    assert!(task_def.required.contains(&"id".to_string()));
+    assert!(task_def.required.contains(&"type".to_string()));
     assert_eq!(
         task_def.fields["status"].field_type,
         FieldType::Enum(vec!["open".into(), "in_progress".into(), "done".into()])
@@ -105,9 +103,8 @@ fn make_registry() -> TypeRegistry {
 types:
   task:
     folder: "tasks"
-    required: [id, type, title, status]
+    required: [type, title, status]
     fields:
-      id:     { type: string }
       type:   { const: task }
       title:  { type: string }
       status: { enum: [open, in_progress, done] }
@@ -123,7 +120,6 @@ types:
 fn test_validate_valid_frontmatter() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -135,7 +131,6 @@ fn test_validate_valid_frontmatter() {
 fn test_validate_missing_required_field() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     // missing title and status
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
@@ -148,7 +143,6 @@ fn test_validate_missing_required_field() {
 fn test_validate_invalid_enum_value() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("kinda_done".into()));
@@ -165,7 +159,6 @@ fn test_validate_invalid_enum_value() {
 fn test_validate_wrong_const() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("project".into())); // wrong const
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -177,7 +170,6 @@ fn test_validate_wrong_const() {
 fn test_validate_date_field_accepts_date() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -193,7 +185,6 @@ fn test_validate_date_field_accepts_date() {
 fn test_validate_date_field_rejects_bad_string() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -207,7 +198,6 @@ fn test_validate_date_field_rejects_bad_string() {
 fn test_validate_date_field_rejects_non_string_non_date() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -221,7 +211,6 @@ fn test_validate_date_field_rejects_non_string_non_date() {
 fn test_validate_array_field_rejects_non_array() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -235,7 +224,6 @@ fn test_validate_array_field_rejects_non_array() {
 fn test_validate_array_field_accepts_null() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -248,7 +236,6 @@ fn test_validate_array_field_accepts_null() {
 fn test_validate_bool_field_rejects_non_bool() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -265,7 +252,6 @@ fn test_validate_bool_field_rejects_non_bool() {
 fn test_validate_number_field_rejects_non_number() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
@@ -282,7 +268,6 @@ fn test_validate_multiple_errors() {
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("id"));
     assert!(err.contains("type"));
     assert!(err.contains("title"));
     assert!(err.contains("status"));
@@ -292,7 +277,6 @@ fn test_validate_multiple_errors() {
 fn test_validate_unknown_fields_allowed() {
     let registry = make_registry();
     let mut fm = HashMap::new();
-    fm.insert("id".into(), Value::String("task-001".into()));
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));

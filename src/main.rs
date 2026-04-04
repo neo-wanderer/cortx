@@ -44,6 +44,7 @@ fn main() {
         Commands::Meta(args) => cli::meta::run(args, &config),
         Commands::Note(args) => cli::note::run(args, &config),
         Commands::Doctor(args) => cli::doctor::run(args, &config),
+        Commands::Schema(args) => cli::schema::run(args, &config),
     };
 
     if let Err(e) = result {

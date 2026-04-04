@@ -9,19 +9,6 @@ pub struct TestVault {
 impl TestVault {
     pub fn new() -> Self {
         let dir = TempDir::new().unwrap();
-        for folder in &[
-            "0_Inbox",
-            "1_Projects",
-            "1_Projects/tasks",
-            "2_Areas",
-            "3_Resources",
-            "3_Resources/notes",
-            "4_Archive",
-            "5_People",
-            "5_Companies",
-        ] {
-            fs::create_dir_all(dir.path().join(folder)).unwrap();
-        }
         TestVault { dir }
     }
 

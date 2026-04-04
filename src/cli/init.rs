@@ -1,8 +1,12 @@
 use crate::error::{CortxError, Result};
 use crate::global_config::GlobalConfig;
+use crate::schema::registry::TypeRegistry;
 use clap::Args;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
+
+const STRUCTURAL_FOLDERS: &[&str] = &["0_Inbox", "4_Archive"];
 
 #[derive(Args)]
 pub struct InitArgs {
@@ -29,24 +33,23 @@ pub fn run(args: &InitArgs) -> Result<()> {
         )));
     }
 
-    let folders = [
-        "0_Inbox",
-        "1_Projects",
-        "1_Projects/tasks",
-        "2_Areas",
-        "3_Resources",
-        "3_Resources/notes",
-        "4_Archive",
-        "5_People",
-        "5_Companies",
-    ];
+    let default_types = include_str!("../../types.yaml");
+    let registry = TypeRegistry::from_yaml_str(default_types)?;
+
+    let mut folders: BTreeSet<String> = STRUCTURAL_FOLDERS.iter().map(|s| s.to_string()).collect();
+    for type_name in registry.type_names() {
+        if let Some(def) = registry.get(type_name) {
+            if !def.folder.is_empty() {
+                folders.insert(def.folder.clone());
+            }
+        }
+    }
 
     for folder in &folders {
         fs::create_dir_all(vault_path.join(folder))?;
     }
 
     let types_dest = vault_path.join("types.yaml");
-    let default_types = include_str!("../../types.yaml");
     fs::write(&types_dest, default_types)?;
 
     println!("Initialized cortx vault at {}", vault_path.display());

@@ -21,12 +21,12 @@ Load the relevant file using the Read tool when the task arises. Do not load all
 
 | When... | Load |
 |---|---|
-| Processing any input (meeting notes, email dump, brain dump) | `~/.claude/skills/jarvis/ingestion.md` |
-| Capturing and clarifying tasks | `~/.claude/skills/jarvis/capture.md` |
-| User asks for daily brief or starts the day | `~/.claude/skills/jarvis/daily-brief.md` |
-| User asks for weekly review | `~/.claude/skills/jarvis/weekly-review.md` |
-| After any write — checking for nudges | `~/.claude/skills/jarvis/nudges.md` |
-| User asks "what should I work on?" or about task priority | `~/.claude/skills/jarvis/prioritization.md` |
+| Processing any input (meeting notes, email dump, brain dump) | `jarvis/ingestion.md` |
+| Capturing and clarifying tasks | `jarvis/capture.md` |
+| User asks for daily brief or starts the day | `jarvis/daily-brief.md` |
+| User asks for weekly review | `jarvis/weekly-review.md` |
+| After any write — checking for nudges | `jarvis/nudges.md` |
+| User asks "what should I work on?" or about task priority | `jarvis/prioritization.md` |
 
 ## Behavioral Rules (always enforce)
 

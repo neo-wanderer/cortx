@@ -25,7 +25,7 @@ cortx is a schema-driven Rust CLI for managing Second Brain entities (tasks, pro
 ```bash
 cargo build                    # Build debug
 cargo build --release          # Build release
-cargo test                     # Run all tests (65 integration + 10 doctests)
+cargo test                     # Run all tests (233 integration + 11 doctests)
 cargo test --test storage_test # Run a specific integration test file
 cargo test --test cli_integration_test -- test_create_and_show  # Run a single test by name
 cargo test --doc               # Run doctests only

@@ -1838,3 +1838,75 @@ fn test_create_explicit_id_overrides_slug() {
         .stdout(predicate::str::contains("Created 2026-04-04-buy-groceries"));
     assert!(vault.file_exists("1_Projects/tasks/2026-04-04-buy-groceries.md"));
 }
+
+#[test]
+fn test_schema_validate_valid() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["schema", "validate"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("valid"));
+}
+
+#[test]
+fn test_schema_validate_detects_unknown_ref() {
+    let vault = TestVault::new();
+    // Write a types.yaml with a ref pointing to a nonexistent type
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  task:
+    folder: "1_Projects/tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: nonexistent_type
+        bidirectional: true
+        inverse: tasks
+"#,
+    );
+    let mut cmd = Command::cargo_bin("cortx").unwrap();
+    cmd.arg("--vault").arg(vault.path().to_str().unwrap());
+    cmd.args(["schema", "validate"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("nonexistent_type"));
+}
+
+#[test]
+fn test_schema_validate_detects_missing_inverse_field() {
+    let vault = TestVault::new();
+    // goal type doesn't have a 'tasks' field, but task.goal declares inverse: tasks
+    vault.write_file(
+        "types.yaml",
+        r#"types:
+  goal:
+    folder: "goals"
+    required: [type, title]
+    fields:
+      type:  { const: goal }
+      title: { type: string }
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type:  { const: task }
+      title: { type: string }
+      goal:
+        type: link
+        ref: goal
+        bidirectional: true
+        inverse: tasks
+"#,
+    );
+    let mut cmd = Command::cargo_bin("cortx").unwrap();
+    cmd.arg("--vault").arg(vault.path().to_str().unwrap());
+    cmd.args(["schema", "validate"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("tasks"));
+}

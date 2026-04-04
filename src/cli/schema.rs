@@ -22,6 +22,8 @@ pub enum SchemaCommands {
         #[arg(long, default_value = "text")]
         format: String,
     },
+    /// Validate types.yaml — check ref integrity and relation consistency
+    Validate,
 }
 
 fn field_type_str(ft: &FieldType) -> String {
@@ -68,6 +70,27 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
                     let def = config.registry.get(name).unwrap();
                     println!("  {name}  (folder: {})", def.folder);
                 }
+            }
+        }
+
+        SchemaCommands::Validate => {
+            let issues = validate_schema_types(config);
+            if issues.is_empty() {
+                let type_count = config.registry.type_names().len();
+                let (bidir_count, poly_count) = count_relation_stats(config);
+                println!(
+                    "types.yaml is valid ({type_count} types, {bidir_count} bidirectional relations, {poly_count} polymorphic fields)."
+                );
+            } else {
+                for issue in &issues {
+                    println!("{issue}");
+                }
+                let err_count = issues.iter().filter(|e| e.starts_with("ERROR")).count();
+                let warn_count = issues.iter().filter(|e| e.starts_with("WARN")).count();
+                println!("\n{err_count} error(s), {warn_count} warning(s).");
+                return Err(CortxError::Validation(format!(
+                    "{err_count} schema error(s) found"
+                )));
             }
         }
 
@@ -200,4 +223,108 @@ pub fn run(args: &SchemaArgs, config: &Config) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Validate all link fields in the registry for ref integrity and inverse consistency.
+/// Returns a list of human-readable issue strings prefixed with ERROR or WARN.
+fn validate_schema_types(config: &Config) -> Vec<String> {
+    let mut issues: Vec<String> = Vec::new();
+
+    for type_name in config.registry.type_names() {
+        let type_def = config.registry.get(type_name).unwrap();
+
+        for (field_name, field_def) in &type_def.fields {
+            let (link_def, is_array) = match &field_def.field_type {
+                FieldType::Link(d) => (d, false),
+                FieldType::ArrayLink(d) => (d, true),
+                _ => continue,
+            };
+
+            // inverse_one on array[link] doesn't make sense
+            if link_def.inverse_one && is_array {
+                issues.push(format!(
+                    "WARN  {type_name}.{field_name} — inverse_one: true on array[link] field (ignored)"
+                ));
+            }
+
+            // Collect (ref_type, inverse) pairs to check
+            let targets: Vec<(&str, Option<&str>)> = match &link_def.targets {
+                LinkTargets::Single { ref_type, inverse } => {
+                    if ref_type.is_empty() {
+                        continue;
+                    }
+                    vec![(ref_type.as_str(), inverse.as_deref())]
+                }
+                LinkTargets::Poly(targets) => targets
+                    .iter()
+                    .map(|t| (t.ref_type.as_str(), t.inverse.as_deref()))
+                    .collect(),
+            };
+
+            for (ref_type, inverse) in targets {
+                // Check ref type exists in registry
+                let target_def = match config.registry.get(ref_type) {
+                    Some(d) => d,
+                    None => {
+                        issues.push(format!(
+                            "ERROR  {type_name}.{field_name} — ref type '{ref_type}' not found in registry"
+                        ));
+                        continue;
+                    }
+                };
+
+                if !link_def.bidirectional {
+                    continue;
+                }
+
+                // Bidirectional: check inverse is declared
+                let inv_field = match inverse {
+                    Some(f) => f,
+                    None => {
+                        issues.push(format!(
+                            "ERROR  {type_name}.{field_name} — bidirectional: true but no inverse declared for ref '{ref_type}'"
+                        ));
+                        continue;
+                    }
+                };
+
+                // Check inverse field exists on target type
+                if !target_def.fields.contains_key(inv_field) {
+                    issues.push(format!(
+                        "ERROR  {type_name}.{field_name} — inverse '{inv_field}' not found on type '{ref_type}'"
+                    ));
+                }
+
+                // Check for reflexive loop (same type, same field)
+                if ref_type == type_name && inv_field == field_name {
+                    issues.push(format!(
+                        "ERROR  {type_name}.{field_name} — reflexive bidirectional link points to same field"
+                    ));
+                }
+            }
+        }
+    }
+
+    issues
+}
+
+fn count_relation_stats(config: &Config) -> (usize, usize) {
+    let mut bidir = 0usize;
+    let mut poly = 0usize;
+    for type_name in config.registry.type_names() {
+        let type_def = config.registry.get(type_name).unwrap();
+        for field_def in type_def.fields.values() {
+            let link_def = match &field_def.field_type {
+                FieldType::Link(d) | FieldType::ArrayLink(d) => d,
+                _ => continue,
+            };
+            if link_def.bidirectional {
+                bidir += 1;
+            }
+            if matches!(link_def.targets, LinkTargets::Poly(_)) {
+                poly += 1;
+            }
+        }
+    }
+    (bidir, poly)
 }

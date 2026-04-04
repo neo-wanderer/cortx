@@ -227,7 +227,56 @@ This keeps the CLI simple and gives agents full control over naming conventions.
 
 ---
 
-## 5. Open Questions
+## 5. Schema Validation Command
+
+### `cortx schema validate`
+
+Validates `types.yaml` itself — distinct from `cortx doctor validate` which validates entity files against the schema.
+
+**Checks performed:**
+
+1. **Parseable** — `types.yaml` loads without YAML or registry parse errors.
+2. **Ref integrity** — every `ref` type name in a link field exists in the registry.
+3. **Inverse field exists** — for bidirectional fields, the declared `inverse` field name exists on the target type's schema.
+4. **Polymorphic inverse integrity** — for each target in a polymorphic `ref` map, the declared `inverse` field exists on that target type.
+5. **`inverse_one` constraint** — `inverse_one: true` only appears on `type: link` fields, never `array[link]`.
+6. **No reflexive infinite loop** — a bidirectional link from type A to type A where the inverse field is the same field as the source is flagged.
+
+**Output (report-only, no `--fix` — schema files are human-authored):**
+
+```
+$ cortx schema validate
+
+Checking types.yaml...
+
+ERROR  task.goal — inverse 'tasks' not found on type 'goal'
+ERROR  note.related (poly: area) — inverse 'related_notes' not found on type 'area'
+WARN   person.emergency_contact — inverse_one: true on array[link] field (ignored)
+
+2 error(s), 1 warning(s).
+```
+
+On success:
+```
+$ cortx schema validate
+types.yaml is valid (8 types, 3 bidirectional relations, 2 polymorphic fields).
+```
+
+**Placement:** `cortx schema validate` — same namespace as `cortx schema types` and `cortx schema show`.
+
+**Distinction from other commands:**
+
+| Command | Validates |
+|---|---|
+| `cortx schema validate` | `types.yaml` structure and relation consistency |
+| `cortx doctor validate` | Entity files against the schema |
+| `cortx doctor links` | Bidirectional relation values across the vault |
+
+**Affected files:** `src/cli/schema.rs` (new `Validate` subcommand), `src/schema/registry.rs` (expose relation metadata needed for cross-type checks).
+
+---
+
+## 6. Open Questions
 
 - [x] `cortx doctor links` repair mode: **report-only by default, `--fix` flag to auto-repair.** Consistent with `eslint --fix` / `rustfmt` convention. Agents can call `cortx doctor links --fix` as part of scheduled maintenance.
 - [x] Slug generation: **transliterate Unicode to ASCII** using the `deunicode` crate. `"Réunion café"` → `reunion-cafe.md`. Preserves readability; handles fully non-Latin titles (e.g., Japanese) better than stripping.
@@ -246,5 +295,6 @@ This keeps the CLI simple and gives agents full control over naming conventions.
 | `src/entity.rs` | `Entity::new()` takes explicit `id` param; remove frontmatter derivation |
 | `src/storage/markdown.rs` | Derive ID from `file_stem()`; implement two-file lock for bidirectional writes |
 | `src/cli/create.rs` | Generate slug from title; remove `id` insertion into frontmatter; collision error |
-| `src/cli/doctor.rs` | Add `links` subcommand validation for bidirectional consistency |
+| `src/cli/schema.rs` | Add `Validate` subcommand for `cortx schema validate` |
+| `src/cli/doctor.rs` | Upgrade `links` subcommand to use relation schema (replace regex with schema-aware checks); add `--fix` flag |
 | `tests/` | Update all fixtures and assertions for new ID/filename format |

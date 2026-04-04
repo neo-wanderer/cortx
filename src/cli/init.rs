@@ -38,10 +38,10 @@ pub fn run(args: &InitArgs) -> Result<()> {
 
     let mut folders: BTreeSet<String> = STRUCTURAL_FOLDERS.iter().map(|s| s.to_string()).collect();
     for type_name in registry.type_names() {
-        if let Some(def) = registry.get(type_name) {
-            if !def.folder.is_empty() {
-                folders.insert(def.folder.clone());
-            }
+        if let Some(def) = registry.get(type_name)
+            && !def.folder.is_empty()
+        {
+            folders.insert(def.folder.clone());
         }
     }
 

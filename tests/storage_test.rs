@@ -183,7 +183,7 @@ fn test_create_duplicate_entity() {
     repo.create("task-dup", fm.clone(), "", &registry).unwrap();
 
     let err = repo.create("task-dup", fm, "", &registry).unwrap_err();
-    assert!(err.to_string().contains("already exists"));
+    assert!(err.to_string().contains("collides"));
 }
 
 #[test]
@@ -289,6 +289,76 @@ types:
             .any(|l| l.starts_with("project:") && l.contains("[[Website Redesign]]")),
         "project line missing wikilink: {raw}"
     );
+}
+
+#[test]
+fn create_rejects_case_insensitive_collision() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+  note:
+    folder: "notes"
+    required: [type, title]
+    fields:
+      type: { const: note }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let mut fm1 = HashMap::new();
+    fm1.insert("type".into(), Value::String("task".into()));
+    fm1.insert("title".into(), Value::String("Buy Groceries".into()));
+    repo.create("Buy Groceries", fm1, "", &registry).unwrap();
+
+    // Same id — must collide
+    let mut fm2 = HashMap::new();
+    fm2.insert("type".into(), Value::String("note".into()));
+    fm2.insert("title".into(), Value::String("Buy Groceries".into()));
+    let err = repo.create("Buy Groceries", fm2, "", &registry);
+    assert!(err.is_err(), "expected collision error");
+
+    // Case-only difference — must still collide (even across types)
+    let mut fm3 = HashMap::new();
+    fm3.insert("type".into(), Value::String("note".into()));
+    fm3.insert("title".into(), Value::String("buy groceries".into()));
+    let err = repo.create("buy groceries", fm3, "", &registry);
+    assert!(err.is_err(), "expected case-insensitive collision error");
+}
+
+#[test]
+fn find_by_title_case_insensitive() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let mut fm = HashMap::new();
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Buy Groceries".into()));
+    repo.create("Buy Groceries", fm, "", &registry).unwrap();
+
+    // Exact match
+    let entity = repo.get_by_id("Buy Groceries", &registry).unwrap();
+    assert_eq!(entity.id, "Buy Groceries");
+
+    // Case-insensitive match also works
+    let entity = repo.get_by_id("buy groceries", &registry).unwrap();
+    assert_eq!(entity.id, "Buy Groceries");
 }
 
 #[test]

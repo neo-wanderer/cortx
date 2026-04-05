@@ -32,18 +32,47 @@ impl MarkdownRepository {
     }
 
     fn find_file_by_id(&self, id: &str, registry: &TypeRegistry) -> Result<PathBuf> {
+        // Case-insensitive scan returns the actual filesystem path with correct case.
+        // Works identically on case-sensitive (Linux) and case-insensitive (macOS) filesystems.
+        if let Some(path) = self.find_case_insensitive_collision(id, registry) {
+            return Ok(path);
+        }
+        Err(CortxError::NotFound(format!("entity '{id}' not found")))
+    }
+
+    /// Scan every type folder for an existing file whose stem matches `id`
+    /// case-insensitively. Returns the first match.
+    pub fn find_case_insensitive_collision(
+        &self,
+        id: &str,
+        registry: &TypeRegistry,
+    ) -> Option<PathBuf> {
+        let lower = id.to_lowercase();
         for type_name in registry.type_names() {
-            if let Some(type_def) = registry.get(type_name) {
-                let path = self
-                    .vault_path
-                    .join(&type_def.folder)
-                    .join(format!("{id}.md"));
-                if path.exists() {
-                    return Ok(path);
+            let Some(type_def) = registry.get(type_name) else {
+                continue;
+            };
+            let folder = self.vault_path.join(&type_def.folder);
+            if !folder.exists() {
+                continue;
+            }
+            for entry in WalkDir::new(&folder)
+                .max_depth(1)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let path = entry.path();
+                if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                    continue;
+                }
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                    && stem.to_lowercase() == lower
+                {
+                    return Some(path.to_path_buf());
                 }
             }
         }
-        Err(CortxError::NotFound(format!("entity '{id}' not found")))
+        None
     }
 
     fn read_entity(&self, path: &Path, registry: &TypeRegistry) -> Result<Entity> {
@@ -212,10 +241,11 @@ impl Repository for MarkdownRepository {
 
         let path = self.resolve_path(&type_name, id, registry)?;
 
-        if path.exists() {
+        if let Some(existing) = self.find_case_insensitive_collision(id, registry) {
             return Err(CortxError::Storage(format!(
-                "entity '{id}' already exists at {}",
-                path.display()
+                "entity id '{id}' collides with existing file at {} (case-insensitive match). \
+                 Choose a different title.",
+                existing.display()
             )));
         }
 

@@ -267,7 +267,7 @@ types:
       title: { type: string }
 "#;
     let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
-    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+    let repo = MarkdownRepository::new(vault.path().to_path_buf()).with_link_validation(false);
 
     let mut fm = HashMap::new();
     fm.insert("type".into(), Value::String("task".into()));
@@ -359,6 +359,116 @@ types:
     // Case-insensitive match also works
     let entity = repo.get_by_id("buy groceries", &registry).unwrap();
     assert_eq!(entity.id, "Buy Groceries");
+}
+
+#[test]
+fn create_rejects_dangling_link_ref() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let mut fm = HashMap::new();
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Buy Groceries".into()));
+    fm.insert(
+        "project".into(),
+        Value::String("Nonexistent Project".into()),
+    );
+
+    let err = repo.create("Buy Groceries", fm, "", &registry);
+    assert!(
+        err.is_err(),
+        "expected link validation to reject dangling ref"
+    );
+    let msg = format!("{}", err.unwrap_err());
+    assert!(
+        msg.contains("Nonexistent Project"),
+        "error should mention the missing target: {msg}"
+    );
+}
+
+#[test]
+fn create_accepts_existing_link_ref() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    // Create the target project first
+    let mut pfm = HashMap::new();
+    pfm.insert("type".into(), Value::String("project".into()));
+    pfm.insert("title".into(), Value::String("Website Redesign".into()));
+    repo.create("Website Redesign", pfm, "", &registry).unwrap();
+
+    // Now create a task that refers to it — should succeed
+    let mut tfm = HashMap::new();
+    tfm.insert("type".into(), Value::String("task".into()));
+    tfm.insert("title".into(), Value::String("Buy Groceries".into()));
+    tfm.insert("project".into(), Value::String("Website Redesign".into()));
+    repo.create("Buy Groceries", tfm, "", &registry).unwrap();
+}
+
+#[test]
+fn no_validate_links_bypasses_validation() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf()).with_link_validation(false);
+
+    let mut fm = HashMap::new();
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Buy Groceries".into()));
+    fm.insert(
+        "project".into(),
+        Value::String("Nonexistent Project".into()),
+    );
+    repo.create("Buy Groceries", fm, "", &registry).unwrap();
 }
 
 #[test]

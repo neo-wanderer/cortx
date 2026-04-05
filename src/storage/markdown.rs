@@ -14,11 +14,80 @@ use crate::value::Value;
 
 pub struct MarkdownRepository {
     vault_path: PathBuf,
+    pub validate_links: bool,
 }
 
 impl MarkdownRepository {
     pub fn new(vault_path: PathBuf) -> Self {
-        MarkdownRepository { vault_path }
+        MarkdownRepository {
+            vault_path,
+            validate_links: true,
+        }
+    }
+
+    pub fn with_link_validation(mut self, enabled: bool) -> Self {
+        self.validate_links = enabled;
+        self
+    }
+
+    /// Verify every link-typed field in `frontmatter` resolves to an existing
+    /// entity. Polymorphic links succeed if any allowed target type contains
+    /// a matching title.
+    pub fn validate_link_targets(
+        &self,
+        frontmatter: &HashMap<String, Value>,
+        type_def: &crate::schema::types::TypeDefinition,
+        registry: &TypeRegistry,
+    ) -> Result<()> {
+        use crate::schema::types::{FieldType, LinkTargets};
+
+        for (field_name, field_def) in &type_def.fields {
+            let link_def = match &field_def.field_type {
+                FieldType::Link(d) | FieldType::ArrayLink(d) => d,
+                _ => continue,
+            };
+
+            let refs: Vec<String> = match frontmatter.get(field_name) {
+                Some(Value::String(s)) if !s.is_empty() => vec![s.clone()],
+                Some(Value::Array(items)) => items
+                    .iter()
+                    .filter_map(|v| v.as_str().filter(|s| !s.is_empty()).map(|s| s.to_string()))
+                    .collect(),
+                _ => continue,
+            };
+            if refs.is_empty() {
+                continue;
+            }
+
+            let target_types: Vec<String> = match &link_def.targets {
+                LinkTargets::Single { ref_type, .. } => vec![ref_type.clone()],
+                LinkTargets::Poly(targets) => {
+                    targets.iter().map(|t| t.ref_type.clone()).collect()
+                }
+            };
+
+            for title in &refs {
+                let mut found = false;
+                for tt in &target_types {
+                    if let Some(target_def) = registry.get(tt) {
+                        let path = self
+                            .vault_path
+                            .join(&target_def.folder)
+                            .join(format!("{title}.md"));
+                        if path.exists() {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if !found {
+                    return Err(CortxError::Validation(format!(
+                        "field '{field_name}': no entity found with title '{title}' in allowed target types {target_types:?}"
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn resolve_path(&self, type_name: &str, id: &str, registry: &TypeRegistry) -> Result<PathBuf> {
@@ -239,6 +308,10 @@ impl Repository for MarkdownRepository {
 
         validate_frontmatter(&frontmatter, type_def)?;
 
+        if self.validate_links {
+            self.validate_link_targets(&frontmatter, type_def, registry)?;
+        }
+
         let path = self.resolve_path(&type_name, id, registry)?;
 
         if let Some(existing) = self.find_case_insensitive_collision(id, registry) {
@@ -300,6 +373,9 @@ impl Repository for MarkdownRepository {
 
         if let Some(type_def) = registry.get(&entity.entity_type) {
             validate_frontmatter(&entity.frontmatter, type_def)?;
+            if self.validate_links {
+                self.validate_link_targets(&entity.frontmatter, type_def, registry)?;
+            }
         }
 
         // Wrap link-typed fields before serialization

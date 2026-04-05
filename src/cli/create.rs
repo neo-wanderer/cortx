@@ -26,10 +26,15 @@ pub struct CreateArgs {
 
     #[arg(long = "set", num_args = 1)]
     pub fields: Vec<String>,
+
+    /// Skip link-target existence validation (for bulk imports)
+    #[arg(long)]
+    pub no_validate_links: bool,
 }
 
 pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
-    let repo = MarkdownRepository::new(config.vault_path.clone());
+    let repo = MarkdownRepository::new(config.vault_path.clone())
+        .with_link_validation(!args.no_validate_links);
 
     let mut fm = HashMap::new();
     fm.insert("type".into(), Value::String(args.entity_type.clone()));

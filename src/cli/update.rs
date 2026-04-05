@@ -11,10 +11,15 @@ pub struct UpdateArgs {
 
     #[arg(long = "set", num_args = 1, required = true)]
     pub updates: Vec<String>,
+
+    /// Skip link-target existence validation (for bulk imports)
+    #[arg(long)]
+    pub no_validate_links: bool,
 }
 
 pub fn run(args: &UpdateArgs, config: &Config) -> Result<()> {
-    let repo = MarkdownRepository::new(config.vault_path.clone());
+    let repo = MarkdownRepository::new(config.vault_path.clone())
+        .with_link_validation(!args.no_validate_links);
 
     let mut updates = HashMap::new();
     for kv in &args.updates {

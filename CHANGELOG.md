@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed (BREAKING)
+
+- Entities are now identified by their human title (filesystem-safe), not a slug. Files are named `Buy Groceries.md` instead of `buy-groceries.md`. Sanitization replaces `/ \ : * ? " < > |` and control chars with spaces, collapses whitespace, strips trailing dots, NFC-normalizes.
+- Link-typed frontmatter fields are stored as Obsidian wikilinks (`project: "[[Website Redesign]]"`). cortx wraps on write and unwraps on read; CLI and query language continue to accept bare titles.
+- `cortx show`/`update`/`archive`/`delete`/`note` now take a human title as the positional argument. Lookup is case-insensitive.
+- `update --set title=...` is rejected — use `cortx rename` instead.
+- `cortx create` rejects on case-insensitive title collision across the entire vault.
+
+### Added
+
+- `cortx rename "<old>" "<new>"` command with transactional cascade (file rename, frontmatter back-refs, body wikilinks). Flags: `--dry-run`, `--skip-body`.
+- `cortx doctor filenames` subcommand: detects filename/title drift, case-insensitive collisions, wikilink format issues. `--fix` auto-repairs drift and wraps bare link values. `--check-bodies` scans note bodies for unresolved wikilinks.
+- `--no-validate-links` flag on `create`/`update` bypasses link-target existence checks (for bulk imports).
+- `rename_bench` criterion benchmark at 100/500/5000 entities.
+
+### Removed
+
+- The `to_slug` function and `deunicode` dependency.
+
 ## [0.5.0] - 2026-04-04
 
 ### Documentation

@@ -46,14 +46,22 @@ impl MarkdownRepository {
         Err(CortxError::NotFound(format!("entity '{id}' not found")))
     }
 
-    fn read_entity(&self, path: &Path) -> Result<Entity> {
+    fn read_entity(&self, path: &Path, registry: &TypeRegistry) -> Result<Entity> {
         let content = std::fs::read_to_string(path)?;
-        let (fm, body) = parse_frontmatter(&content)?;
+        let (mut fm, body) = parse_frontmatter(&content)?;
         let id = path
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
+
+        // Unwrap link-typed fields using the entity's type definition
+        if let Some(type_name) = fm.get("type").and_then(|v| v.as_str())
+            && let Some(type_def) = registry.get(type_name)
+        {
+            crate::wikilink::unwrap_frontmatter(&mut fm, type_def)?;
+        }
+
         Ok(Entity::new(id, fm, body).with_path(path.to_path_buf()))
     }
 
@@ -126,6 +134,13 @@ impl MarkdownRepository {
             let ref_content = std::fs::read_to_string(&ref_path)?;
             let (mut ref_fm, ref_body) = parse_frontmatter(&ref_content)?;
 
+            // Unwrap link-typed fields so we're working with bare titles
+            if let Some(ref_type_name) = ref_fm.get("type").and_then(|v| v.as_str())
+                && let Some(ref_type_def) = registry.get(ref_type_name)
+            {
+                crate::wikilink::unwrap_frontmatter(&mut ref_fm, ref_type_def)?;
+            }
+
             let arr = ref_fm
                 .entry(inverse_field)
                 .or_insert_with(|| Value::Array(vec![]));
@@ -146,7 +161,7 @@ impl MarkdownRepository {
         Ok(())
     }
 
-    fn scan_folder(&self, folder: &Path) -> Result<Vec<Entity>> {
+    fn scan_folder(&self, folder: &Path, registry: &TypeRegistry) -> Result<Vec<Entity>> {
         if !folder.exists() {
             return Ok(Vec::new());
         }
@@ -161,7 +176,7 @@ impl MarkdownRepository {
 
         let entities: Vec<Entity> = paths
             .par_iter()
-            .filter_map(|path| self.read_entity(path).ok())
+            .filter_map(|path| self.read_entity(path, registry).ok())
             .collect();
 
         Ok(entities)
@@ -215,7 +230,7 @@ impl Repository for MarkdownRepository {
 
     fn get_by_id(&self, id: &str, registry: &TypeRegistry) -> Result<Entity> {
         let path = self.find_file_by_id(id, registry)?;
-        self.read_entity(&path)
+        self.read_entity(&path, registry)
     }
 
     fn update(
@@ -229,7 +244,7 @@ impl Repository for MarkdownRepository {
         // Acquire file lock
         let lock = file_lock::FileLock::acquire(&path)?;
 
-        let mut entity = self.read_entity(&path)?;
+        let mut entity = self.read_entity(&path, registry)?;
 
         let updates_snapshot = updates.clone();
 
@@ -280,7 +295,7 @@ impl Repository for MarkdownRepository {
             .get(entity_type)
             .ok_or_else(|| CortxError::Schema(format!("unknown type '{entity_type}'")))?;
         let folder = self.vault_path.join(&type_def.folder);
-        self.scan_folder(&folder)
+        self.scan_folder(&folder, registry)
     }
 
     fn list_all(&self, registry: &TypeRegistry) -> Result<Vec<Entity>> {

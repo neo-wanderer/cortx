@@ -2,9 +2,9 @@ mod common;
 
 use common::TestVault;
 use cortx::schema::registry::TypeRegistry;
-use cortx::storage::Repository;
 use cortx::storage::file_lock::FileLock;
 use cortx::storage::markdown::MarkdownRepository;
+use cortx::storage::Repository;
 use cortx::value::Value;
 use std::collections::HashMap;
 
@@ -184,6 +184,60 @@ fn test_create_duplicate_entity() {
 
     let err = repo.create("task-dup", fm, "", &registry).unwrap_err();
     assert!(err.to_string().contains("already exists"));
+}
+
+#[test]
+fn read_entity_unwraps_link_fields() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+      related: { type: "array[link]", ref: note }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+  note:
+    folder: "notes"
+    required: [type, title]
+    fields:
+      type: { const: note }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+
+    vault.write_file(
+        "tasks/Buy Groceries.md",
+        "---\n\
+         type: task\n\
+         title: Buy Groceries\n\
+         project: \"[[Website Redesign]]\"\n\
+         related:\n  - \"[[Weekly Review]]\"\n  - \"[[Meal Planning]]\"\n\
+         ---\n",
+    );
+
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+    let entity = repo.get_by_id("Buy Groceries", &registry).unwrap();
+
+    assert_eq!(
+        entity.frontmatter.get("project"),
+        Some(&Value::String("Website Redesign".into()))
+    );
+    assert_eq!(
+        entity.frontmatter.get("related"),
+        Some(&Value::Array(vec![
+            Value::String("Weekly Review".into()),
+            Value::String("Meal Planning".into()),
+        ]))
+    );
 }
 
 #[test]

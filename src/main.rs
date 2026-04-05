@@ -9,6 +9,7 @@ pub mod schema;
 pub mod slug;
 pub mod storage;
 pub mod value;
+pub mod wikilink;
 
 use clap::Parser;
 use cli::{Cli, Commands};

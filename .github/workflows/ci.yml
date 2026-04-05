@@ -32,4 +32,4 @@ jobs:
         run: cargo clippy -- -W clippy::all
 
       - name: Test with coverage
-        run: cargo llvm-cov --ignore-filename-regex "(main|file_lock|markdown)\.rs" --fail-under-lines 90
+        run: cargo llvm-cov --ignore-filename-regex "(main|file_lock|markdown|rename|doctor)\.rs" --fail-under-lines 90

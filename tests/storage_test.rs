@@ -472,6 +472,57 @@ types:
 }
 
 #[test]
+fn bidirectional_creates_wrapped_inverse() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project, bidirectional: true, inverse: tasks }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task, bidirectional: true, inverse: project }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    // Create project first
+    let mut pfm = HashMap::new();
+    pfm.insert("type".into(), Value::String("project".into()));
+    pfm.insert("title".into(), Value::String("Website Redesign".into()));
+    repo.create("Website Redesign", pfm, "", &registry).unwrap();
+
+    // Create task with link to it — bidirectional inverse should be applied
+    let mut tfm = HashMap::new();
+    tfm.insert("type".into(), Value::String("task".into()));
+    tfm.insert("title".into(), Value::String("Buy Groceries".into()));
+    tfm.insert("project".into(), Value::String("Website Redesign".into()));
+    repo.create("Buy Groceries", tfm, "", &registry).unwrap();
+
+    // Verify project's tasks array contains the wrapped title
+    let proj_content = vault.read_file("projects/Website Redesign.md");
+    assert!(
+        proj_content.contains("[[Buy Groceries]]"),
+        "project should have wrapped back-ref: {proj_content}"
+    );
+
+    // And unwrap on read returns bare title
+    let project = repo.get_by_id("Website Redesign", &registry).unwrap();
+    assert_eq!(
+        project.frontmatter.get("tasks"),
+        Some(&Value::Array(vec![Value::String("Buy Groceries".into())]))
+    );
+}
+
+#[test]
 fn test_get_nonexistent_entity() {
     let vault = TestVault::new();
     let registry = test_registry();

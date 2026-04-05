@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::Result;
-use crate::storage::Repository;
 use crate::storage::markdown::MarkdownRepository;
+use crate::storage::Repository;
 use clap::Args;
 use std::collections::HashMap;
 
@@ -19,6 +19,11 @@ pub fn run(args: &UpdateArgs, config: &Config) -> Result<()> {
     let mut updates = HashMap::new();
     for kv in &args.updates {
         if let Some((k, v)) = kv.split_once('=') {
+            if k == "title" {
+                return Err(crate::error::CortxError::Validation(
+                    "use 'cortx rename' to change an entity's title".into(),
+                ));
+            }
             let value = super::create::parse_cli_value(v);
             updates.insert(k.to_string(), value);
         }

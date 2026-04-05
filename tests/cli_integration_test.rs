@@ -16,6 +16,21 @@ fn cortx_cmd(vault: &TestVault) -> Command {
 }
 
 #[test]
+fn update_rejects_title_change() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Buy Groceries"])
+        .assert()
+        .success();
+
+    cortx_cmd(&vault)
+        .args(["update", "Buy Groceries", "--set", "title=Weekly Groceries"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cortx rename"));
+}
+
+#[test]
 fn create_uses_sanitized_title_as_id() {
     let vault = TestVault::new();
     cortx_cmd(&vault)

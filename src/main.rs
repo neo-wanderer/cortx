@@ -9,6 +9,7 @@ pub mod schema;
 pub mod slug;
 pub mod storage;
 pub mod value;
+pub mod wikilink;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -46,6 +47,7 @@ fn main() {
         Commands::Note(args) => cli::note::run(args, &config),
         Commands::Doctor(args) => cli::doctor::run(args, &config),
         Commands::Schema(args) => cli::schema::run(args, &config),
+        Commands::Rename(args) => cli::rename::run(args, &config),
     };
 
     if let Err(e) = result {

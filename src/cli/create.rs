@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::error::Result;
-use crate::slug::to_slug;
+use crate::slug::sanitize_title;
 use crate::storage::Repository;
 use crate::storage::markdown::MarkdownRepository;
 use crate::value::Value;
@@ -26,10 +26,15 @@ pub struct CreateArgs {
 
     #[arg(long = "set", num_args = 1)]
     pub fields: Vec<String>,
+
+    /// Skip link-target existence validation (for bulk imports)
+    #[arg(long)]
+    pub no_validate_links: bool,
 }
 
 pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
-    let repo = MarkdownRepository::new(config.vault_path.clone());
+    let repo = MarkdownRepository::new(config.vault_path.clone())
+        .with_link_validation(!args.no_validate_links);
 
     let mut fm = HashMap::new();
     fm.insert("type".into(), Value::String(args.entity_type.clone()));
@@ -41,17 +46,23 @@ pub fn run(args: &CreateArgs, config: &Config) -> Result<()> {
         fm.insert("name".into(), Value::String(name.clone()));
     }
 
-    // Determine id: explicit --id flag takes priority, else slug from title/name/type
+    // Determine id: explicit --id flag takes priority, else sanitize title/name/type
     let id = if let Some(explicit) = &args.id {
-        explicit.clone()
+        sanitize_title(explicit)
     } else {
         let base = args
             .title
             .as_deref()
             .or(args.name.as_deref())
             .unwrap_or(&args.entity_type);
-        to_slug(base)
+        sanitize_title(base)
     };
+
+    if id.is_empty() {
+        return Err(crate::error::CortxError::Validation(
+            "title produces empty id after sanitization — provide a title with alphanumeric content".into()
+        ));
+    }
 
     if let Some(type_def) = config.registry.get(&args.entity_type)
         && type_def.fields.contains_key("status")

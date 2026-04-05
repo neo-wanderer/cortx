@@ -6,6 +6,7 @@ pub mod init;
 pub mod meta;
 pub mod note;
 pub mod query_cmd;
+pub mod rename;
 pub mod schema;
 pub mod show;
 pub mod update;
@@ -55,4 +56,6 @@ pub enum Commands {
     Doctor(doctor::DoctorArgs),
     /// Inspect types and field schemas
     Schema(schema::SchemaArgs),
+    /// Rename an entity (cascades to all back-references)
+    Rename(rename::RenameArgs),
 }

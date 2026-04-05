@@ -183,7 +183,343 @@ fn test_create_duplicate_entity() {
     repo.create("task-dup", fm.clone(), "", &registry).unwrap();
 
     let err = repo.create("task-dup", fm, "", &registry).unwrap_err();
-    assert!(err.to_string().contains("already exists"));
+    assert!(err.to_string().contains("collides"));
+}
+
+#[test]
+fn read_entity_unwraps_link_fields() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+      related: { type: "array[link]", ref: note }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+  note:
+    folder: "notes"
+    required: [type, title]
+    fields:
+      type: { const: note }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+
+    vault.write_file(
+        "tasks/Buy Groceries.md",
+        "---\n\
+         type: task\n\
+         title: Buy Groceries\n\
+         project: \"[[Website Redesign]]\"\n\
+         related:\n  - \"[[Weekly Review]]\"\n  - \"[[Meal Planning]]\"\n\
+         ---\n",
+    );
+
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+    let entity = repo.get_by_id("Buy Groceries", &registry).unwrap();
+
+    assert_eq!(
+        entity.frontmatter.get("project"),
+        Some(&Value::String("Website Redesign".into()))
+    );
+    assert_eq!(
+        entity.frontmatter.get("related"),
+        Some(&Value::Array(vec![
+            Value::String("Weekly Review".into()),
+            Value::String("Meal Planning".into()),
+        ]))
+    );
+}
+
+#[test]
+fn create_wraps_link_fields_in_file() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+      related: { type: "array[link]", ref: note }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+  note:
+    folder: "notes"
+    required: [type, title]
+    fields:
+      type: { const: note }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf()).with_link_validation(false);
+
+    let mut fm = HashMap::new();
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Buy Groceries".into()));
+    fm.insert("project".into(), Value::String("Website Redesign".into()));
+    fm.insert(
+        "related".into(),
+        Value::Array(vec![Value::String("Weekly Review".into())]),
+    );
+    repo.create("Buy Groceries", fm, "", &registry).unwrap();
+
+    // Read the raw file and verify wikilinks are present (quote style is serializer's choice)
+    let raw = vault.read_file("tasks/Buy Groceries.md");
+    assert!(raw.contains("[[Website Redesign]]"), "got: {raw}");
+    assert!(raw.contains("[[Weekly Review]]"), "got: {raw}");
+    // And the project field line must have the wikilink
+    assert!(
+        raw.lines()
+            .any(|l| l.starts_with("project:") && l.contains("[[Website Redesign]]")),
+        "project line missing wikilink: {raw}"
+    );
+}
+
+#[test]
+fn create_rejects_case_insensitive_collision() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+  note:
+    folder: "notes"
+    required: [type, title]
+    fields:
+      type: { const: note }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let mut fm1 = HashMap::new();
+    fm1.insert("type".into(), Value::String("task".into()));
+    fm1.insert("title".into(), Value::String("Buy Groceries".into()));
+    repo.create("Buy Groceries", fm1, "", &registry).unwrap();
+
+    // Same id — must collide
+    let mut fm2 = HashMap::new();
+    fm2.insert("type".into(), Value::String("note".into()));
+    fm2.insert("title".into(), Value::String("Buy Groceries".into()));
+    let err = repo.create("Buy Groceries", fm2, "", &registry);
+    assert!(err.is_err(), "expected collision error");
+
+    // Case-only difference — must still collide (even across types)
+    let mut fm3 = HashMap::new();
+    fm3.insert("type".into(), Value::String("note".into()));
+    fm3.insert("title".into(), Value::String("buy groceries".into()));
+    let err = repo.create("buy groceries", fm3, "", &registry);
+    assert!(err.is_err(), "expected case-insensitive collision error");
+}
+
+#[test]
+fn find_by_title_case_insensitive() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let mut fm = HashMap::new();
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Buy Groceries".into()));
+    repo.create("Buy Groceries", fm, "", &registry).unwrap();
+
+    // Exact match
+    let entity = repo.get_by_id("Buy Groceries", &registry).unwrap();
+    assert_eq!(entity.id, "Buy Groceries");
+
+    // Case-insensitive match also works
+    let entity = repo.get_by_id("buy groceries", &registry).unwrap();
+    assert_eq!(entity.id, "Buy Groceries");
+}
+
+#[test]
+fn create_rejects_dangling_link_ref() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let mut fm = HashMap::new();
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Buy Groceries".into()));
+    fm.insert(
+        "project".into(),
+        Value::String("Nonexistent Project".into()),
+    );
+
+    let err = repo.create("Buy Groceries", fm, "", &registry);
+    assert!(
+        err.is_err(),
+        "expected link validation to reject dangling ref"
+    );
+    let msg = format!("{}", err.unwrap_err());
+    assert!(
+        msg.contains("Nonexistent Project"),
+        "error should mention the missing target: {msg}"
+    );
+}
+
+#[test]
+fn create_accepts_existing_link_ref() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    // Create the target project first
+    let mut pfm = HashMap::new();
+    pfm.insert("type".into(), Value::String("project".into()));
+    pfm.insert("title".into(), Value::String("Website Redesign".into()));
+    repo.create("Website Redesign", pfm, "", &registry).unwrap();
+
+    // Now create a task that refers to it — should succeed
+    let mut tfm = HashMap::new();
+    tfm.insert("type".into(), Value::String("task".into()));
+    tfm.insert("title".into(), Value::String("Buy Groceries".into()));
+    tfm.insert("project".into(), Value::String("Website Redesign".into()));
+    repo.create("Buy Groceries", tfm, "", &registry).unwrap();
+}
+
+#[test]
+fn no_validate_links_bypasses_validation() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf()).with_link_validation(false);
+
+    let mut fm = HashMap::new();
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Buy Groceries".into()));
+    fm.insert(
+        "project".into(),
+        Value::String("Nonexistent Project".into()),
+    );
+    repo.create("Buy Groceries", fm, "", &registry).unwrap();
+}
+
+#[test]
+fn bidirectional_creates_wrapped_inverse() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project, bidirectional: true, inverse: tasks }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+      tasks: { type: "array[link]", ref: task, bidirectional: true, inverse: project }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    // Create project first
+    let mut pfm = HashMap::new();
+    pfm.insert("type".into(), Value::String("project".into()));
+    pfm.insert("title".into(), Value::String("Website Redesign".into()));
+    repo.create("Website Redesign", pfm, "", &registry).unwrap();
+
+    // Create task with link to it — bidirectional inverse should be applied
+    let mut tfm = HashMap::new();
+    tfm.insert("type".into(), Value::String("task".into()));
+    tfm.insert("title".into(), Value::String("Buy Groceries".into()));
+    tfm.insert("project".into(), Value::String("Website Redesign".into()));
+    repo.create("Buy Groceries", tfm, "", &registry).unwrap();
+
+    // Verify project's tasks array contains the wrapped title
+    let proj_content = vault.read_file("projects/Website Redesign.md");
+    assert!(
+        proj_content.contains("[[Buy Groceries]]"),
+        "project should have wrapped back-ref: {proj_content}"
+    );
+
+    // And unwrap on read returns bare title
+    let project = repo.get_by_id("Website Redesign", &registry).unwrap();
+    assert_eq!(
+        project.frontmatter.get("tasks"),
+        Some(&Value::Array(vec![Value::String("Buy Groceries".into())]))
+    );
 }
 
 #[test]

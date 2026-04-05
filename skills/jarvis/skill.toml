@@ -1,0 +1,7 @@
+[skill]
+name = "jarvis"
+version = "0.1.0"
+description = "Personal life assistant for managing a Second Brain vault — daily briefs, weekly reviews, capture ingestion, prioritization, and nudges"
+author = "vigneshjagadeesh"
+license = "MIT"
+tags = ["jarvis", "second-brain", "review", "daily-brief", "prioritization", "capture", "assistant"]

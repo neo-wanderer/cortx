@@ -33,39 +33,42 @@ cargo build --release
 cortx init my-vault
 cd my-vault
 
-# Create entities — ID is auto-generated as a slug from the title
+# Create entities — ID is the sanitized title (filesystem-safe)
 cortx create task --title "Review PR" --set "due=2026-04-05" --set "priority=high"
-# → creates 1_Projects/tasks/review-pr.md with ID: review-pr
+# → creates 1_Projects/tasks/Review PR.md
 
-cortx create project --title "Q2 Planning" --set "status=open"
-# → creates 1_Projects/q2-planning.md with ID: q2-planning
+cortx create project --title "Q2 Planning" --set "status=active"
+# → creates 1_Projects/Q2 Planning.md
 
-# Query entities
+# Query entities (use bare titles — wikilink wrapping is transparent)
 cortx query 'type = "task" and status != "done" and due < today'
 cortx query 'type = "note" and text ~ "meeting"'
+cortx query 'project = "Q2 Planning"'
 ```
 
 ## CLI Reference
 
 ```
 cortx init [path]                                     # Bootstrap vault structure
-cortx create <type> --title "..." [--set k=v]         # Create entity (ID auto-generated as title slug)
-cortx show <id>                                       # Display entity
-cortx update <id> --set k=v                           # Update fields
-cortx archive <id>                                    # Soft delete (status=archived)
-cortx delete <id> --force                             # Hard delete
+cortx create <type> --title "..." [--set k=v]         # Create entity (ID = sanitized title)
+cortx show "<title>"                                  # Display entity
+cortx update "<title>" --set k=v                      # Update fields
+cortx archive "<title>"                               # Soft delete (status=archived)
+cortx delete "<title>" --force                        # Hard delete
+cortx rename "<old>" "<new>"                          # Rename entity + cascade all back-refs
 cortx query '<expression>'                            # Filter entities
 cortx meta distinct <field> [--where '<expr>']        # Distinct field values
 cortx meta count-by <field> [--where '<expr>']        # Group counts
-cortx note headings <id>                              # List headings
-cortx note insert-after-heading <id> --heading "..."  # Insert content
-cortx note replace-block <id> --block-id <id> ...     # Replace block
-cortx note read-lines <id> --start N --end M          # Read line range
+cortx note headings "<title>"                         # List headings
+cortx note insert-after-heading "<title>" --heading "..." # Insert content
+cortx note replace-block "<title>" --block-id <id> ... # Replace block
+cortx note read-lines "<title>" --start N --end M     # Read line range
 cortx schema types [--format json]                    # List all entity types
 cortx schema show <type> [--format json]              # Show type fields and schema
 cortx schema validate                                 # Check ref integrity in types.yaml
 cortx doctor validate                                 # Validate all files against schemas
 cortx doctor links [--fix]                            # Check bidirectional relation consistency
+cortx doctor filenames [--fix] [--check-bodies]       # Check filename drift, case collisions, wikilink format
 ```
 
 ## Query Language
@@ -94,7 +97,8 @@ cortx query 'type = "note" and text ~ "protein"'
 
 - **Hexagonal architecture**: CLI (clap) -> domain layer -> Repository trait -> storage adapter
 - **Schema-driven**: Entity types defined in `types.yaml`, loaded at runtime. Add new types with config changes only.
-- **Human-readable filenames**: Entity IDs are slugs derived from the title (e.g., `buy-groceries.md`). Override with `--id`. Obsidian-compatible — no synthetic `id` field in frontmatter.
+- **Human-readable filenames**: Entity IDs are filesystem-safe sanitized titles (e.g., `Buy Groceries.md`). The title is the identity — used in filename, CLI args, wikilinks, and references. Global uniqueness (case-insensitive) enforced on create.
+- **Obsidian-native wikilinks**: Link-typed frontmatter fields store `"[[Title]]"` strings so they render as clickable links in Obsidian. Graph view, backlinks, and rename propagation work without any config.
 - **Relation schema**: `types.yaml` declares `link` and `array[link]` fields with optional `bidirectional` and `inverse` metadata. Bidirectional writes update both files atomically with lock ordering to prevent deadlocks.
 - **Parallel reads**: `rayon` for concurrent frontmatter parsing across files
 - **File locking**: RAII file-level `.lock` files for safe concurrent writes

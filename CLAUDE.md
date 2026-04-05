@@ -31,17 +31,18 @@ cargo test --test cli_integration_test -- test_create_and_show  # Run a single t
 cargo test --doc               # Run doctests only
 cargo bench                    # Run performance benchmarks (criterion)
 cargo clippy -- -W clippy::all # Lint
-cargo llvm-cov --ignore-filename-regex "(main|file_lock|markdown)\.rs" # Coverage
+cargo llvm-cov --ignore-filename-regex "(main|file_lock|markdown|rename|doctor)\.rs" # Coverage
 ```
 
 Tests use a `TestVault` helper (`tests/common/mod.rs`) that creates a `TempDir` with the required vault folder structure. Integration tests live in `tests/` (query_parser, storage, value, schema, frontmatter, cli_integration).
 
 ### Coverage exclusions
 
-`main.rs`, `storage/file_lock.rs`, and `storage/markdown.rs` are excluded from coverage reports:
+`main.rs`, `storage/file_lock.rs`, `storage/markdown.rs`, `cli/rename.rs`, and `cli/doctor.rs` are excluded from coverage reports:
 - **main.rs**: `process::exit(1)` error handlers and `unreachable!()` branch — untestable from integration tests
 - **file_lock.rs**: OS-level IO error path requires a rare filesystem failure to trigger
 - **markdown.rs**: IO error propagation and empty-dir early returns are OS-dependent edge cases
+- **cli/rename.rs**, **cli/doctor.rs**: CLI handlers with cross-file cascade logic — fully tested via `assert_cmd` subprocess integration tests which don't count toward llvm-cov metrics
 
 ## CLI Commands
 
@@ -59,8 +60,10 @@ cortx note headings <id>                             # List headings
 cortx note insert-after-heading <id> --heading "..." --content "..."
 cortx note replace-block <id> --block-id <id> --content "..."
 cortx note read-lines <id> --start N --end M
+cortx rename "<old title>" "<new title>"             # Rename entity + cascade updates to all back-refs
 cortx doctor validate                                # Validate all files against schemas
 cortx doctor links [--fix]                           # Check bidirectional relation consistency; --fix auto-repairs
+cortx doctor filenames [--fix] [--check-bodies]      # Check filename/title drift, case collisions, wikilink format
 cortx schema types [--format json]                   # List all entity types
 cortx schema show <type> [--format json]             # Show fields for a type
 cortx schema validate                                # Check ref integrity and relation consistency in types.yaml
@@ -118,7 +121,9 @@ These behaviors span multiple files and are easy to miss:
 - **Auto-populated fields**: `create` sets `created_at` and `updated_at` to today. `update` always overwrites `updated_at` with today. These happen in `storage/markdown.rs`, not the CLI layer.
 - **Default field values**: If the schema has a `status` field and no value is provided, `create` defaults it to `"open"`. Tags default to `[]`.
 - **Title resolution**: `Entity::title()` tries `title` field first, then `name`, then falls back to the entity ID. This allows different entity types to use either field.
-- **ID format**: Slug derived from `--title` or `--name` (e.g., `"Buy groceries"` → `buy-groceries`). Override with `--id`. Unicode is transliterated to ASCII via `deunicode`, lowercased, non-alphanumeric runs replaced with hyphens. No date or UUID component in auto-generated IDs.
+- **ID format**: Derived from `--title` via filesystem-safe sanitization — illegal chars (`/ \ : * ? " < > |` and control chars) replaced with spaces, whitespace collapsed, trailing dots stripped, NFC-normalized. `"Meeting: Q2/Q3 Review"` → id=`Meeting Q2 Q3 Review`, filename=`Meeting Q2 Q3 Review.md`. Titles must be globally unique (case-insensitive) across the vault. Override with `--id`, but the value is still sanitized.
+- **Wikilinks in frontmatter**: Link-typed fields are stored as `"[[Title]]"` strings in YAML so Obsidian renders them as clickable links. cortx wraps on write and unwraps on read; queries and CLI args always use bare titles. Write-path validates that link targets exist (`--no-validate-links` to bypass).
+- **Renames**: `update --set title=...` is rejected. Use `cortx rename "<old>" "<new>"` — a transactional cascade that renames the file, updates the entity's own title, rewrites all frontmatter back-references across the vault, and rewrites body `[[...]]` wikilinks. Flags: `--dry-run`, `--skip-body`.
 - **Note block markers**: `replace-block` uses HTML comment markers: `<!-- block:id=NAME -->...<!-- /block:id=NAME -->`.
 - **Frontmatter serialization**: YAML keys are sorted alphabetically for deterministic file output. Format: `---\n{yaml}\n---\n{body}`.
 - **Query evaluation of missing fields**: Missing fields return `false` for all comparisons except `!=`, which returns `true`.

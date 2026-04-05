@@ -14,11 +14,78 @@ use crate::value::Value;
 
 pub struct MarkdownRepository {
     vault_path: PathBuf,
+    pub validate_links: bool,
 }
 
 impl MarkdownRepository {
     pub fn new(vault_path: PathBuf) -> Self {
-        MarkdownRepository { vault_path }
+        MarkdownRepository {
+            vault_path,
+            validate_links: true,
+        }
+    }
+
+    pub fn with_link_validation(mut self, enabled: bool) -> Self {
+        self.validate_links = enabled;
+        self
+    }
+
+    /// Verify every link-typed field in `frontmatter` resolves to an existing
+    /// entity. Polymorphic links succeed if any allowed target type contains
+    /// a matching title.
+    pub fn validate_link_targets(
+        &self,
+        frontmatter: &HashMap<String, Value>,
+        type_def: &crate::schema::types::TypeDefinition,
+        registry: &TypeRegistry,
+    ) -> Result<()> {
+        use crate::schema::types::{FieldType, LinkTargets};
+
+        for (field_name, field_def) in &type_def.fields {
+            let link_def = match &field_def.field_type {
+                FieldType::Link(d) | FieldType::ArrayLink(d) => d,
+                _ => continue,
+            };
+
+            let refs: Vec<String> = match frontmatter.get(field_name) {
+                Some(Value::String(s)) if !s.is_empty() => vec![s.clone()],
+                Some(Value::Array(items)) => items
+                    .iter()
+                    .filter_map(|v| v.as_str().filter(|s| !s.is_empty()).map(|s| s.to_string()))
+                    .collect(),
+                _ => continue,
+            };
+            if refs.is_empty() {
+                continue;
+            }
+
+            let target_types: Vec<String> = match &link_def.targets {
+                LinkTargets::Single { ref_type, .. } => vec![ref_type.clone()],
+                LinkTargets::Poly(targets) => targets.iter().map(|t| t.ref_type.clone()).collect(),
+            };
+
+            for title in &refs {
+                let mut found = false;
+                for tt in &target_types {
+                    if let Some(target_def) = registry.get(tt) {
+                        let path = self
+                            .vault_path
+                            .join(&target_def.folder)
+                            .join(format!("{title}.md"));
+                        if path.exists() {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if !found {
+                    return Err(CortxError::Validation(format!(
+                        "field '{field_name}': no entity found with title '{title}' in allowed target types {target_types:?}"
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn resolve_path(&self, type_name: &str, id: &str, registry: &TypeRegistry) -> Result<PathBuf> {
@@ -32,28 +99,65 @@ impl MarkdownRepository {
     }
 
     fn find_file_by_id(&self, id: &str, registry: &TypeRegistry) -> Result<PathBuf> {
-        for type_name in registry.type_names() {
-            if let Some(type_def) = registry.get(type_name) {
-                let path = self
-                    .vault_path
-                    .join(&type_def.folder)
-                    .join(format!("{id}.md"));
-                if path.exists() {
-                    return Ok(path);
-                }
-            }
+        // Case-insensitive scan returns the actual filesystem path with correct case.
+        // Works identically on case-sensitive (Linux) and case-insensitive (macOS) filesystems.
+        if let Some(path) = self.find_case_insensitive_collision(id, registry) {
+            return Ok(path);
         }
         Err(CortxError::NotFound(format!("entity '{id}' not found")))
     }
 
-    fn read_entity(&self, path: &Path) -> Result<Entity> {
+    /// Scan every type folder for an existing file whose stem matches `id`
+    /// case-insensitively. Returns the first match.
+    pub fn find_case_insensitive_collision(
+        &self,
+        id: &str,
+        registry: &TypeRegistry,
+    ) -> Option<PathBuf> {
+        let lower = id.to_lowercase();
+        for type_name in registry.type_names() {
+            let Some(type_def) = registry.get(type_name) else {
+                continue;
+            };
+            let folder = self.vault_path.join(&type_def.folder);
+            if !folder.exists() {
+                continue;
+            }
+            for entry in WalkDir::new(&folder)
+                .max_depth(1)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let path = entry.path();
+                if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                    continue;
+                }
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                    && stem.to_lowercase() == lower
+                {
+                    return Some(path.to_path_buf());
+                }
+            }
+        }
+        None
+    }
+
+    fn read_entity(&self, path: &Path, registry: &TypeRegistry) -> Result<Entity> {
         let content = std::fs::read_to_string(path)?;
-        let (fm, body) = parse_frontmatter(&content)?;
+        let (mut fm, body) = parse_frontmatter(&content)?;
         let id = path
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
+
+        // Unwrap link-typed fields using the entity's type definition
+        if let Some(type_name) = fm.get("type").and_then(|v| v.as_str())
+            && let Some(type_def) = registry.get(type_name)
+        {
+            crate::wikilink::unwrap_frontmatter(&mut fm, type_def)?;
+        }
+
         Ok(Entity::new(id, fm, body).with_path(path.to_path_buf()))
     }
 
@@ -126,6 +230,13 @@ impl MarkdownRepository {
             let ref_content = std::fs::read_to_string(&ref_path)?;
             let (mut ref_fm, ref_body) = parse_frontmatter(&ref_content)?;
 
+            // Unwrap link-typed fields so we're working with bare titles
+            if let Some(ref_type_name) = ref_fm.get("type").and_then(|v| v.as_str())
+                && let Some(ref_type_def) = registry.get(ref_type_name)
+            {
+                crate::wikilink::unwrap_frontmatter(&mut ref_fm, ref_type_def)?;
+            }
+
             let arr = ref_fm
                 .entry(inverse_field)
                 .or_insert_with(|| Value::Array(vec![]));
@@ -139,6 +250,16 @@ impl MarkdownRepository {
                 }
             }
 
+            // Wrap link-typed fields before serialization
+            if let Some(ref_type_name) = ref_fm
+                .get("type")
+                .and_then(|v| v.as_str())
+                .map(String::from)
+                && let Some(ref_type_def) = registry.get(&ref_type_name)
+            {
+                crate::wikilink::wrap_frontmatter(&mut ref_fm, ref_type_def);
+            }
+
             let updated = serialize_entity(&ref_fm, &ref_body);
             std::fs::write(&ref_path, updated)?;
         }
@@ -146,7 +267,7 @@ impl MarkdownRepository {
         Ok(())
     }
 
-    fn scan_folder(&self, folder: &Path) -> Result<Vec<Entity>> {
+    fn scan_folder(&self, folder: &Path, registry: &TypeRegistry) -> Result<Vec<Entity>> {
         if !folder.exists() {
             return Ok(Vec::new());
         }
@@ -161,7 +282,7 @@ impl MarkdownRepository {
 
         let entities: Vec<Entity> = paths
             .par_iter()
-            .filter_map(|path| self.read_entity(path).ok())
+            .filter_map(|path| self.read_entity(path, registry).ok())
             .collect();
 
         Ok(entities)
@@ -188,12 +309,17 @@ impl Repository for MarkdownRepository {
 
         validate_frontmatter(&frontmatter, type_def)?;
 
+        if self.validate_links {
+            self.validate_link_targets(&frontmatter, type_def, registry)?;
+        }
+
         let path = self.resolve_path(&type_name, id, registry)?;
 
-        if path.exists() {
+        if let Some(existing) = self.find_case_insensitive_collision(id, registry) {
             return Err(CortxError::Storage(format!(
-                "entity '{id}' already exists at {}",
-                path.display()
+                "entity id '{id}' collides with existing file at {} (case-insensitive match). \
+                 Choose a different title.",
+                existing.display()
             )));
         }
 
@@ -201,11 +327,15 @@ impl Repository for MarkdownRepository {
             std::fs::create_dir_all(parent)?;
         }
 
-        let content = serialize_entity(&frontmatter, body);
+        // Wrap link-typed fields before serialization
+        let mut fm_for_write = frontmatter.clone();
+        crate::wikilink::wrap_frontmatter(&mut fm_for_write, type_def);
+
+        let content = serialize_entity(&fm_for_write, body);
         let _lock = file_lock::FileLock::acquire(&path)?;
         std::fs::write(&path, content)?;
 
-        // Maintain bidirectional inverse fields
+        // Maintain bidirectional inverse fields (use bare-title values)
         for (field_name, value) in &frontmatter {
             self.apply_bidirectional(id, field_name, value, registry, type_def)?;
         }
@@ -215,7 +345,7 @@ impl Repository for MarkdownRepository {
 
     fn get_by_id(&self, id: &str, registry: &TypeRegistry) -> Result<Entity> {
         let path = self.find_file_by_id(id, registry)?;
-        self.read_entity(&path)
+        self.read_entity(&path, registry)
     }
 
     fn update(
@@ -229,7 +359,7 @@ impl Repository for MarkdownRepository {
         // Acquire file lock
         let lock = file_lock::FileLock::acquire(&path)?;
 
-        let mut entity = self.read_entity(&path)?;
+        let mut entity = self.read_entity(&path, registry)?;
 
         let updates_snapshot = updates.clone();
 
@@ -244,9 +374,17 @@ impl Repository for MarkdownRepository {
 
         if let Some(type_def) = registry.get(&entity.entity_type) {
             validate_frontmatter(&entity.frontmatter, type_def)?;
+            if self.validate_links {
+                self.validate_link_targets(&entity.frontmatter, type_def, registry)?;
+            }
         }
 
-        let content = serialize_entity(&entity.frontmatter, &entity.body);
+        // Wrap link-typed fields before serialization
+        let mut fm_for_write = entity.frontmatter.clone();
+        if let Some(type_def) = registry.get(&entity.entity_type) {
+            crate::wikilink::wrap_frontmatter(&mut fm_for_write, type_def);
+        }
+        let content = serialize_entity(&fm_for_write, &entity.body);
         std::fs::write(&path, content)?;
 
         lock.release()?;
@@ -280,7 +418,7 @@ impl Repository for MarkdownRepository {
             .get(entity_type)
             .ok_or_else(|| CortxError::Schema(format!("unknown type '{entity_type}'")))?;
         let folder = self.vault_path.join(&type_def.folder);
-        self.scan_folder(&folder)
+        self.scan_folder(&folder, registry)
     }
 
     fn list_all(&self, registry: &TypeRegistry) -> Result<Vec<Entity>> {

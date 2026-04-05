@@ -239,5 +239,91 @@ fn bench_query_scan(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_query_scan);
+/// Build a vault where `n` tasks all reference one shared project.
+/// Returns the TempDir (holds the vault alive) and the vault path.
+fn build_vault_with_refs(n: usize) -> (TempDir, std::path::PathBuf) {
+    let dir = TempDir::new().unwrap();
+    let vault_path = dir.path().to_path_buf();
+
+    // Minimal schema
+    fs::write(
+        vault_path.join("types.yaml"),
+        r#"types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+"#,
+    )
+    .unwrap();
+
+    let registry = TypeRegistry::from_yaml_file(&vault_path.join("types.yaml")).unwrap();
+    let repo = MarkdownRepository::new(vault_path.clone()).with_link_validation(false);
+
+    // Create the central project
+    let mut pfm = HashMap::new();
+    pfm.insert("type".into(), Value::String("project".into()));
+    pfm.insert("title".into(), Value::String("Central Project".into()));
+    repo.create("Central Project", pfm, "", &registry).unwrap();
+
+    // Create n tasks referencing it
+    for i in 0..n {
+        let mut tfm = HashMap::new();
+        tfm.insert("type".into(), Value::String("task".into()));
+        let title = format!("Task {i:05}");
+        tfm.insert("title".into(), Value::String(title.clone()));
+        tfm.insert("project".into(), Value::String("Central Project".into()));
+        repo.create(&title, tfm, "", &registry).unwrap();
+    }
+
+    (dir, vault_path)
+}
+
+fn rename_bench(c: &mut Criterion) {
+    use cortx::cli::rename::{RenameArgs, run as rename_run};
+    use cortx::config::Config;
+
+    let mut group = c.benchmark_group("rename_cascade");
+    group.sample_size(10);
+
+    for size in [100, 500, 5000] {
+        group.bench_function(format!("N={size}"), |b| {
+            b.iter_batched(
+                || {
+                    let (dir, vault_path) = build_vault_with_refs(size);
+                    let registry =
+                        TypeRegistry::from_yaml_file(&vault_path.join("types.yaml")).unwrap();
+                    let config = Config {
+                        vault_path: vault_path.clone(),
+                        registry,
+                    };
+                    let args = RenameArgs {
+                        old_title: "Central Project".into(),
+                        new_title: "Main Project".into(),
+                        dry_run: false,
+                        skip_body: true, // skip body scan to isolate frontmatter cascade
+                    };
+                    (dir, config, args)
+                },
+                |(dir, config, args)| {
+                    rename_run(&args, &config).unwrap();
+                    drop(dir);
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(benches, bench_query_scan, rename_bench);
 criterion_main!(benches);

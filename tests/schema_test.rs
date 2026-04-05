@@ -242,10 +242,12 @@ fn test_validate_bool_field_rejects_non_bool() {
     fm.insert("active".into(), Value::String("yes".into()));
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("must be a boolean"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("must be a boolean")
+    );
 }
 
 #[test]
@@ -283,10 +285,12 @@ fn test_validate_unknown_field_is_rejected() {
     fm.insert("due_date".into(), Value::String("2026-04-05".into()));
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("unknown field 'due_date'"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("unknown field 'due_date'")
+    );
 }
 
 // -- Registry edge cases --

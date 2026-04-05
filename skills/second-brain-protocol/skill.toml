@@ -1,0 +1,23 @@
+[skill]
+name = "second-brain-protocol"
+version = "0.1.0"
+description = "Domain protocol for reading and writing to a cortx Second Brain vault — entity classification, inbox clarification, and relation linking"
+author = "vigneshjagadeesh"
+license = "MIT"
+tags = ["second-brain", "cortx", "vault", "entities", "para", "gtd", "protocol", "cli", "tasks", "notes", "query", "crud"]
+
+[runtime]
+type = "python"
+entry = "src/main.py"
+
+[[tools.provided]]
+name = "cortx"
+description = "Execute a cortx command against the Second Brain vault. The 'command' field is a SINGLE STRING containing the full command line exactly as you would type it in a terminal after 'cortx'. Do NOT split arguments into separate fields — everything goes in one string. Examples: command='create task --title \"Buy Groceries\" --set status=inbox', command='query '\\''type = \"task\" and status = \"open\"'\\''', command='show \"Buy Groceries\"', command='update \"Buy Groceries\" --set status=done', command='rename \"Buy Groceries\" \"Weekly Groceries\"', command='schema show task'."
+input_schema = { type = "object", properties = { command = { type = "string", description = "Single string with the full cortx command line (e.g. 'create task --title \"Buy groceries\"'). This is the ONLY parameter — do not pass additional fields." } }, required = ["command"], additionalProperties = false }
+
+[[tools.provided]]
+name = "cortx_schema"
+description = "Get the schema for a vault entity type — lists all fields, their types, valid values, required/optional, and defaults. Call this BEFORE creating or updating an entity if you are unsure about available fields or valid values. Pass an entity type name to get its schema, or omit to list all available types."
+input_schema = { type = "object", properties = { entity_type = { type = "string", description = "Entity type to inspect (e.g. 'task', 'goal', 'note', 'area', 'resource', 'log', 'person', 'company'). Omit to list all available types." } }, additionalProperties = false }
+
+

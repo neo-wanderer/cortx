@@ -154,6 +154,13 @@ impl MarkdownRepository {
                 }
             }
 
+            // Wrap link-typed fields before serialization
+            if let Some(ref_type_name) = ref_fm.get("type").and_then(|v| v.as_str()).map(String::from)
+                && let Some(ref_type_def) = registry.get(&ref_type_name)
+            {
+                crate::wikilink::wrap_frontmatter(&mut ref_fm, ref_type_def);
+            }
+
             let updated = serialize_entity(&ref_fm, &ref_body);
             std::fs::write(&ref_path, updated)?;
         }
@@ -216,11 +223,15 @@ impl Repository for MarkdownRepository {
             std::fs::create_dir_all(parent)?;
         }
 
-        let content = serialize_entity(&frontmatter, body);
+        // Wrap link-typed fields before serialization
+        let mut fm_for_write = frontmatter.clone();
+        crate::wikilink::wrap_frontmatter(&mut fm_for_write, type_def);
+
+        let content = serialize_entity(&fm_for_write, body);
         let _lock = file_lock::FileLock::acquire(&path)?;
         std::fs::write(&path, content)?;
 
-        // Maintain bidirectional inverse fields
+        // Maintain bidirectional inverse fields (use bare-title values)
         for (field_name, value) in &frontmatter {
             self.apply_bidirectional(id, field_name, value, registry, type_def)?;
         }
@@ -261,7 +272,12 @@ impl Repository for MarkdownRepository {
             validate_frontmatter(&entity.frontmatter, type_def)?;
         }
 
-        let content = serialize_entity(&entity.frontmatter, &entity.body);
+        // Wrap link-typed fields before serialization
+        let mut fm_for_write = entity.frontmatter.clone();
+        if let Some(type_def) = registry.get(&entity.entity_type) {
+            crate::wikilink::wrap_frontmatter(&mut fm_for_write, type_def);
+        }
+        let content = serialize_entity(&fm_for_write, &entity.body);
         std::fs::write(&path, content)?;
 
         lock.release()?;

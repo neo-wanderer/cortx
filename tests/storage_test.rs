@@ -241,6 +241,57 @@ types:
 }
 
 #[test]
+fn create_wraps_link_fields_in_file() {
+    let vault = TestVault::new();
+    let schema_yaml = r#"
+types:
+  task:
+    folder: "tasks"
+    required: [type, title]
+    fields:
+      type: { const: task }
+      title: { type: string }
+      project: { type: link, ref: project }
+      related: { type: "array[link]", ref: note }
+  project:
+    folder: "projects"
+    required: [type, title]
+    fields:
+      type: { const: project }
+      title: { type: string }
+  note:
+    folder: "notes"
+    required: [type, title]
+    fields:
+      type: { const: note }
+      title: { type: string }
+"#;
+    let registry = TypeRegistry::from_yaml_str(schema_yaml).unwrap();
+    let repo = MarkdownRepository::new(vault.path().to_path_buf());
+
+    let mut fm = HashMap::new();
+    fm.insert("type".into(), Value::String("task".into()));
+    fm.insert("title".into(), Value::String("Buy Groceries".into()));
+    fm.insert("project".into(), Value::String("Website Redesign".into()));
+    fm.insert(
+        "related".into(),
+        Value::Array(vec![Value::String("Weekly Review".into())]),
+    );
+    repo.create("Buy Groceries", fm, "", &registry).unwrap();
+
+    // Read the raw file and verify wikilinks are present (quote style is serializer's choice)
+    let raw = vault.read_file("tasks/Buy Groceries.md");
+    assert!(raw.contains("[[Website Redesign]]"), "got: {raw}");
+    assert!(raw.contains("[[Weekly Review]]"), "got: {raw}");
+    // And the project field line must have the wikilink
+    assert!(
+        raw.lines()
+            .any(|l| l.starts_with("project:") && l.contains("[[Website Redesign]]")),
+        "project line missing wikilink: {raw}"
+    );
+}
+
+#[test]
 fn test_get_nonexistent_entity() {
     let vault = TestVault::new();
     let registry = test_registry();

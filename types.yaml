@@ -11,6 +11,7 @@ types:
       assignee:   { type: link, ref: person }
       created_at: { type: date }
       updated_at: { type: date }
+      priority:   { type: number }
       scheduled:  { type: date }
       due:        { type: date }
       tags:       { type: "array[string]", default: "[]" }

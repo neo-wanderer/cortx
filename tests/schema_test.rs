@@ -242,12 +242,10 @@ fn test_validate_bool_field_rejects_non_bool() {
     fm.insert("active".into(), Value::String("yes".into()));
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("must be a boolean")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("must be a boolean"));
 }
 
 #[test]
@@ -276,15 +274,19 @@ fn test_validate_multiple_errors() {
 }
 
 #[test]
-fn test_validate_unknown_fields_allowed() {
+fn test_validate_unknown_field_is_rejected() {
     let registry = make_registry();
     let mut fm = HashMap::new();
     fm.insert("type".into(), Value::String("task".into()));
     fm.insert("title".into(), Value::String("Do thing".into()));
     fm.insert("status".into(), Value::String("open".into()));
-    fm.insert("custom_field".into(), Value::String("anything".into()));
+    fm.insert("due_date".into(), Value::String("2026-04-05".into()));
     let result = validate_frontmatter(&fm, registry.get("task").unwrap());
-    assert!(result.is_ok());
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("unknown field 'due_date'"));
 }
 
 // -- Registry edge cases --

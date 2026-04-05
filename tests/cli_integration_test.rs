@@ -359,9 +359,11 @@ fn test_init_custom_type_folder_created_on_write() {
     folder: "6_Recipes"
     required: [type, title]
     fields:
-      type:  { const: recipe }
-      title: { type: string }
-      tags:  { type: "array[string]", default: "[]" }
+      type:       { const: recipe }
+      title:      { type: string }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
 "#;
     fs::write(vault_path.join("types.yaml"), custom_types).unwrap();
 
@@ -441,22 +443,26 @@ fn test_doctor_links_no_issues_when_inverse_present() {
     folder: "goals"
     required: [type, title]
     fields:
-      type:  { const: goal }
-      title: { type: string }
-      tasks: { type: "array[link]", ref: task }
-      tags:  { type: "array[string]", default: "[]" }
+      type:       { const: goal }
+      title:      { type: string }
+      tasks:      { type: "array[link]", ref: task }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
   task:
     folder: "tasks"
     required: [type, title]
     fields:
-      type:  { const: task }
-      title: { type: string }
+      type:       { const: task }
+      title:      { type: string }
       goal:
         type: link
         ref: goal
         bidirectional: true
         inverse: tasks
-      tags:  { type: "array[string]", default: "[]" }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
 "#,
     );
     vault.write_file(
@@ -486,22 +492,26 @@ fn test_doctor_links_finds_broken_in_frontmatter() {
     folder: "goals"
     required: [type, title]
     fields:
-      type:  { const: goal }
-      title: { type: string }
-      tasks: { type: "array[link]", ref: task }
-      tags:  { type: "array[string]", default: "[]" }
+      type:       { const: goal }
+      title:      { type: string }
+      tasks:      { type: "array[link]", ref: task }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
   task:
     folder: "tasks"
     required: [type, title]
     fields:
-      type:  { const: task }
-      title: { type: string }
+      type:       { const: task }
+      title:      { type: string }
       goal:
         type: link
         ref: goal
         bidirectional: true
         inverse: tasks
-      tags:  { type: "array[string]", default: "[]" }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
 "#,
     );
     vault.write_file(
@@ -1688,12 +1698,10 @@ fn test_vault_name_flag_resolves_correct_vault() {
         .success()
         .stdout(predicate::str::contains("Created task-named-vault"));
     // Verify the file exists in the named vault
-    assert!(
-        vault_dir
-            .path()
-            .join("1_Projects/tasks/task-named-vault.md")
-            .exists()
-    );
+    assert!(vault_dir
+        .path()
+        .join("1_Projects/tasks/task-named-vault.md")
+        .exists());
 }
 
 #[test]
@@ -2023,22 +2031,26 @@ fn test_bidirectional_create_updates_inverse() {
     folder: "goals"
     required: [type, title]
     fields:
-      type:  { const: goal }
-      title: { type: string }
-      tasks: { type: "array[link]", ref: task }
-      tags:  { type: "array[string]", default: "[]" }
+      type:       { const: goal }
+      title:      { type: string }
+      tasks:      { type: "array[link]", ref: task }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
   task:
     folder: "tasks"
     required: [type, title]
     fields:
-      type:  { const: task }
-      title: { type: string }
+      type:       { const: task }
+      title:      { type: string }
       goal:
         type: link
         ref: goal
         bidirectional: true
         inverse: tasks
-      tags:  { type: "array[string]", default: "[]" }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
 "#,
     );
     cortx_cmd(&vault)
@@ -2073,22 +2085,26 @@ fn test_bidirectional_update_adds_to_inverse() {
     folder: "goals"
     required: [type, title]
     fields:
-      type:  { const: goal }
-      title: { type: string }
-      tasks: { type: "array[link]", ref: task }
-      tags:  { type: "array[string]", default: "[]" }
+      type:       { const: goal }
+      title:      { type: string }
+      tasks:      { type: "array[link]", ref: task }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
   task:
     folder: "tasks"
     required: [type, title]
     fields:
-      type:  { const: task }
-      title: { type: string }
+      type:       { const: task }
+      title:      { type: string }
       goal:
         type: link
         ref: goal
         bidirectional: true
         inverse: tasks
-      tags:  { type: "array[string]", default: "[]" }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
 "#,
     );
     cortx_cmd(&vault)
@@ -2120,22 +2136,26 @@ fn test_doctor_links_detects_missing_inverse() {
     folder: "goals"
     required: [type, title]
     fields:
-      type:  { const: goal }
-      title: { type: string }
-      tasks: { type: "array[link]", ref: task }
-      tags:  { type: "array[string]", default: "[]" }
+      type:       { const: goal }
+      title:      { type: string }
+      tasks:      { type: "array[link]", ref: task }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
   task:
     folder: "tasks"
     required: [type, title]
     fields:
-      type:  { const: task }
-      title: { type: string }
+      type:       { const: task }
+      title:      { type: string }
       goal:
         type: link
         ref: goal
         bidirectional: true
         inverse: tasks
-      tags:  { type: "array[string]", default: "[]" }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
 "#,
     );
     vault.write_file(
@@ -2165,22 +2185,26 @@ fn test_doctor_links_fix_repairs_inverse() {
     folder: "goals"
     required: [type, title]
     fields:
-      type:  { const: goal }
-      title: { type: string }
-      tasks: { type: "array[link]", ref: task }
-      tags:  { type: "array[string]", default: "[]" }
+      type:       { const: goal }
+      title:      { type: string }
+      tasks:      { type: "array[link]", ref: task }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
   task:
     folder: "tasks"
     required: [type, title]
     fields:
-      type:  { const: task }
-      title: { type: string }
+      type:       { const: task }
+      title:      { type: string }
       goal:
         type: link
         ref: goal
         bidirectional: true
         inverse: tasks
-      tags:  { type: "array[string]", default: "[]" }
+      created_at: { type: date }
+      updated_at: { type: date }
+      tags:       { type: "array[string]", default: "[]" }
 "#,
     );
     vault.write_file(

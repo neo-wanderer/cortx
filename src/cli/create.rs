@@ -112,5 +112,8 @@ pub fn parse_cli_value(v: &str) -> Value {
             .collect();
         return Value::Array(arr);
     }
+    if let Ok(n) = v.parse::<f64>() {
+        return Value::Number(n);
+    }
     Value::String(v.to_string())
 }

@@ -107,8 +107,9 @@ pub fn validate_frontmatter(
                     // String-like fields; link refs are string IDs — no value-level validation here
                 }
             }
+        } else {
+            errors.push(format!("unknown field '{field_name}'"));
         }
-        // Unknown fields are allowed (forward compatibility)
     }
 
     if errors.is_empty() {

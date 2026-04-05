@@ -555,19 +555,19 @@ fn test_doctor_links_finds_broken_in_frontmatter() {
 "#,
     );
     vault.write_file(
-        "goals/q2-goals.md",
+        "goals/Q2 Goals.md",
         "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
     );
     vault.write_file(
-        "tasks/fix-login.md",
-        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
+        "tasks/Fix login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: \"[[Q2 Goals]]\"\ntags: []\n---\n",
     );
     cortx_cmd(&vault)
         .args(["doctor", "links"])
         .assert()
         .failure()
         .stdout(predicate::str::contains("MISSING INVERSE"))
-        .stdout(predicate::str::contains("fix-login"));
+        .stdout(predicate::str::contains("Fix login"));
 }
 
 #[test]
@@ -747,8 +747,8 @@ fn test_create_with_auto_generated_id() {
         .args(["create", "task", "--title", "Auto ID"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Created auto-id"));
-    assert!(vault.file_exists("1_Projects/tasks/auto-id.md"));
+        .stdout(predicate::str::contains("Created Auto ID"));
+    assert!(vault.file_exists("1_Projects/tasks/Auto ID.md"));
 }
 
 #[test]
@@ -1902,15 +1902,15 @@ fn test_schema_types_custom_vault() {
 }
 
 #[test]
-fn test_create_slug_from_title() {
+fn test_create_id_from_title() {
     let vault = TestVault::new();
     cortx_cmd(&vault)
         .args(["create", "task", "--title", "Buy groceries"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Created buy-groceries"));
-    assert!(vault.file_exists("1_Projects/tasks/buy-groceries.md"));
-    let content = vault.read_file("1_Projects/tasks/buy-groceries.md");
+        .stdout(predicate::str::contains("Created Buy groceries"));
+    assert!(vault.file_exists("1_Projects/tasks/Buy groceries.md"));
+    let content = vault.read_file("1_Projects/tasks/Buy groceries.md");
     assert!(
         !content.contains("id:"),
         "id must not appear in frontmatter"
@@ -1928,7 +1928,7 @@ fn test_create_collision_fails() {
         .args(["create", "task", "--title", "Buy groceries"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("already exists"));
+        .stderr(predicate::str::contains("collides"));
 }
 
 #[test]
@@ -2104,13 +2104,13 @@ fn test_bidirectional_create_updates_inverse() {
             "--title",
             "Fix login bug",
             "--set",
-            "goal=q2-goals",
+            "goal=Q2 Goals",
         ])
         .assert()
         .success();
-    let goal_content = vault.read_file("goals/q2-goals.md");
+    let goal_content = vault.read_file("goals/Q2 Goals.md");
     assert!(
-        goal_content.contains("fix-login-bug"),
+        goal_content.contains("Fix login bug"),
         "goal.tasks should contain the new task id: {goal_content}"
     );
 }
@@ -2156,12 +2156,12 @@ fn test_bidirectional_update_adds_to_inverse() {
         .assert()
         .success();
     cortx_cmd(&vault)
-        .args(["update", "fix-login-bug", "--set", "goal=q2-goals"])
+        .args(["update", "Fix login bug", "--set", "goal=Q2 Goals"])
         .assert()
         .success();
-    let goal_content = vault.read_file("goals/q2-goals.md");
+    let goal_content = vault.read_file("goals/Q2 Goals.md");
     assert!(
-        goal_content.contains("fix-login-bug"),
+        goal_content.contains("Fix login bug"),
         "goal.tasks should contain the task after update: {goal_content}"
     );
 }
@@ -2199,19 +2199,19 @@ fn test_doctor_links_detects_missing_inverse() {
 "#,
     );
     vault.write_file(
-        "goals/q2-goals.md",
+        "goals/Q2 Goals.md",
         "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
     );
     vault.write_file(
-        "tasks/fix-login.md",
-        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
+        "tasks/Fix login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: \"[[Q2 Goals]]\"\ntags: []\n---\n",
     );
 
     cortx_cmd(&vault)
         .args(["doctor", "links"])
         .assert()
         .failure()
-        .stdout(predicate::str::contains("fix-login"))
+        .stdout(predicate::str::contains("Fix login"))
         .stdout(predicate::str::contains("MISSING INVERSE"));
 }
 
@@ -2248,12 +2248,12 @@ fn test_doctor_links_fix_repairs_inverse() {
 "#,
     );
     vault.write_file(
-        "goals/q2-goals.md",
+        "goals/Q2 Goals.md",
         "---\ntype: goal\ntitle: Q2 Goals\ntags: []\n---\n",
     );
     vault.write_file(
-        "tasks/fix-login.md",
-        "---\ntype: task\ntitle: Fix login\ngoal: q2-goals\ntags: []\n---\n",
+        "tasks/Fix login.md",
+        "---\ntype: task\ntitle: Fix login\ngoal: \"[[Q2 Goals]]\"\ntags: []\n---\n",
     );
 
     cortx_cmd(&vault)
@@ -2261,9 +2261,9 @@ fn test_doctor_links_fix_repairs_inverse() {
         .assert()
         .success();
 
-    let goal_content = vault.read_file("goals/q2-goals.md");
+    let goal_content = vault.read_file("goals/Q2 Goals.md");
     assert!(
-        goal_content.contains("fix-login"),
-        "goal.tasks should contain fix-login after --fix: {goal_content}"
+        goal_content.contains("Fix login"),
+        "goal.tasks should contain Fix login after --fix: {goal_content}"
     );
 }

@@ -32,10 +32,11 @@ Load the relevant file using the Read tool when the task arises. Do not load all
 
 These apply in every interaction — no need to load a playbook:
 
-- Task → `in_progress`: always run `cortx update <id> --set start_date=today`
-- Task → `done`: always run `cortx update <id> --set end_date=today`
+- Entities are referenced by their human title (e.g., `"Buy Groceries"`, `"Q2 Planning"`). All CLI args take the bare title. Use `cortx rename "<old>" "<new>"` to change a title — never `update --set title=...`.
+- Task → `in_progress`: always run `cortx update "<title>" --set start_date=today`
+- Task → `done`: always run `cortx update "<title>" --set end_date=today`
 - Goal `kind=time-bound` without dates: ask for `start_date` and `end_date` before saving
 - Goal created without `review_frequency`: always ask before saving — there is no default
 - New task with no goal: leave `goal` empty — inbox is valid, not an error
-- Never hard-delete: use `cortx archive <id>` or `--set status=archived`
+- Never hard-delete: use `cortx archive "<title>"` or `--set status=archived`
 - After any write: load nudges.md and check for triggered nudges

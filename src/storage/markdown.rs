@@ -61,9 +61,7 @@ impl MarkdownRepository {
 
             let target_types: Vec<String> = match &link_def.targets {
                 LinkTargets::Single { ref_type, .. } => vec![ref_type.clone()],
-                LinkTargets::Poly(targets) => {
-                    targets.iter().map(|t| t.ref_type.clone()).collect()
-                }
+                LinkTargets::Poly(targets) => targets.iter().map(|t| t.ref_type.clone()).collect(),
             };
 
             for title in &refs {
@@ -253,7 +251,10 @@ impl MarkdownRepository {
             }
 
             // Wrap link-typed fields before serialization
-            if let Some(ref_type_name) = ref_fm.get("type").and_then(|v| v.as_str()).map(String::from)
+            if let Some(ref_type_name) = ref_fm
+                .get("type")
+                .and_then(|v| v.as_str())
+                .map(String::from)
                 && let Some(ref_type_def) = registry.get(&ref_type_name)
             {
                 crate::wikilink::wrap_frontmatter(&mut ref_fm, ref_type_def);

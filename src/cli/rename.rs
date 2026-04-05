@@ -29,8 +29,7 @@ pub struct RenameArgs {
 }
 
 pub fn run(args: &RenameArgs, config: &Config) -> Result<()> {
-    let repo = MarkdownRepository::new(config.vault_path.clone())
-        .with_link_validation(false); // we're rewriting existing refs, not creating new ones
+    let repo = MarkdownRepository::new(config.vault_path.clone()).with_link_validation(false); // we're rewriting existing refs, not creating new ones
 
     let old_id = sanitize_title(&args.old_title);
     let new_id = sanitize_title(&args.new_title);

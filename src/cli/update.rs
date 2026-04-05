@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::Result;
-use crate::storage::markdown::MarkdownRepository;
 use crate::storage::Repository;
+use crate::storage::markdown::MarkdownRepository;
 use clap::Args;
 use std::collections::HashMap;
 

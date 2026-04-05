@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs;
@@ -10,8 +10,8 @@ use cortx::frontmatter::serialize_entity;
 use cortx::query::evaluator::evaluate;
 use cortx::query::parser::parse_query;
 use cortx::schema::registry::TypeRegistry;
-use cortx::storage::markdown::MarkdownRepository;
 use cortx::storage::Repository;
+use cortx::storage::markdown::MarkdownRepository;
 use cortx::value::Value;
 
 /// Sort specification for benchmarking
@@ -26,11 +26,7 @@ fn compare_values(a: Option<&Value>, b: Option<&Value>, descending: bool) -> Ord
     match (a, b) {
         (Some(av), Some(bv)) => {
             let cmp = av.partial_cmp(bv).unwrap_or(Ordering::Equal);
-            if descending {
-                cmp.reverse()
-            } else {
-                cmp
-            }
+            if descending { cmp.reverse() } else { cmp }
         }
         (None, None) => Ordering::Equal,
         (Some(_), None) => Ordering::Less,
@@ -293,7 +289,7 @@ fn build_vault_with_refs(n: usize) -> (TempDir, std::path::PathBuf) {
 }
 
 fn rename_bench(c: &mut Criterion) {
-    use cortx::cli::rename::{run as rename_run, RenameArgs};
+    use cortx::cli::rename::{RenameArgs, run as rename_run};
     use cortx::config::Config;
 
     let mut group = c.benchmark_group("rename_cascade");

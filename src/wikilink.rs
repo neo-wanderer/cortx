@@ -270,10 +270,7 @@ mod tests {
         let td = mk_type_def_with_link_fields();
         wrap_frontmatter(&mut fm, &td);
 
-        assert_eq!(
-            fm["project"],
-            Value::String("[[Website Redesign]]".into())
-        );
+        assert_eq!(fm["project"], Value::String("[[Website Redesign]]".into()));
         assert_eq!(
             fm["related"],
             Value::Array(vec![

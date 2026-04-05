@@ -16,6 +16,31 @@ fn cortx_cmd(vault: &TestVault) -> Command {
 }
 
 #[test]
+fn create_uses_sanitized_title_as_id() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Buy Groceries"])
+        .assert()
+        .success();
+
+    assert!(
+        vault.file_exists("1_Projects/tasks/Buy Groceries.md"),
+        "expected 1_Projects/tasks/Buy Groceries.md to exist"
+    );
+}
+
+#[test]
+fn create_sanitizes_illegal_chars_in_title() {
+    let vault = TestVault::new();
+    cortx_cmd(&vault)
+        .args(["create", "task", "--title", "Meeting: Q2/Q3 Review"])
+        .assert()
+        .success();
+
+    assert!(vault.file_exists("1_Projects/tasks/Meeting Q2 Q3 Review.md"));
+}
+
+#[test]
 fn test_create_and_show_task() {
     let vault = TestVault::new();
     cortx_cmd(&vault)

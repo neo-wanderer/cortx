@@ -71,6 +71,106 @@ fn rename_updates_filename_and_back_refs() {
 }
 
 #[test]
+fn rename_rewrites_body_wikilinks() {
+    let vault = TestVault::new();
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "project",
+            "--title",
+            "Website Redesign",
+            "--set",
+            "status=active",
+        ])
+        .assert()
+        .success();
+
+    // Append a body wikilink to the project file itself
+    let original = vault.read_file("1_Projects/Website Redesign.md");
+    fs::write(
+        vault.path().join("1_Projects/Website Redesign.md"),
+        format!("{original}\n\nSee [[Website Redesign]] for context.\n"),
+    )
+    .unwrap();
+
+    cortx_cmd(&vault)
+        .args(["rename", "Website Redesign", "Brand Refresh"])
+        .assert()
+        .success();
+
+    let content = vault.read_file("1_Projects/Brand Refresh.md");
+    assert!(
+        content.contains("See [[Brand Refresh]] for context."),
+        "body not rewritten: {content}"
+    );
+}
+
+#[test]
+fn rename_skip_body_preserves_body_wikilinks() {
+    let vault = TestVault::new();
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "project",
+            "--title",
+            "Website Redesign",
+            "--set",
+            "status=active",
+        ])
+        .assert()
+        .success();
+
+    let original = vault.read_file("1_Projects/Website Redesign.md");
+    fs::write(
+        vault.path().join("1_Projects/Website Redesign.md"),
+        format!("{original}\n\nSee [[Website Redesign]] for context.\n"),
+    )
+    .unwrap();
+
+    cortx_cmd(&vault)
+        .args(["rename", "Website Redesign", "Brand Refresh", "--skip-body"])
+        .assert()
+        .success();
+
+    let content = vault.read_file("1_Projects/Brand Refresh.md");
+    assert!(
+        content.contains("See [[Website Redesign]] for context."),
+        "body should be preserved: {content}"
+    );
+}
+
+#[test]
+fn rename_dry_run_writes_nothing() {
+    let vault = TestVault::new();
+
+    cortx_cmd(&vault)
+        .args([
+            "create",
+            "project",
+            "--title",
+            "Website Redesign",
+            "--set",
+            "status=active",
+        ])
+        .assert()
+        .success();
+
+    let before = vault.read_file("1_Projects/Website Redesign.md");
+
+    cortx_cmd(&vault)
+        .args(["rename", "Website Redesign", "Brand Refresh", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("dry-run"));
+
+    assert!(vault.file_exists("1_Projects/Website Redesign.md"));
+    assert!(!vault.file_exists("1_Projects/Brand Refresh.md"));
+    assert_eq!(vault.read_file("1_Projects/Website Redesign.md"), before);
+}
+
+#[test]
 fn rename_rejects_collision() {
     let vault = TestVault::new();
 

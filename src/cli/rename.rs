@@ -7,6 +7,7 @@ use crate::storage::Repository;
 use crate::storage::markdown::MarkdownRepository;
 use crate::value::Value;
 use clap::Args;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -62,8 +63,13 @@ pub fn run(args: &RenameArgs, config: &Config) -> Result<()> {
     // Compute the new path (same folder, new stem)
     let new_path = old_path.with_file_name(format!("{new_id}.md"));
 
-    // Plan: file rename + frontmatter back-ref rewrites
+    // Plan: file rename + frontmatter back-ref rewrites + body wikilink rewrites
     let back_ref_sites = find_back_refs(&config.vault_path, &old_id, &old_path, &config.registry)?;
+    let body_sites = if args.skip_body {
+        Vec::new()
+    } else {
+        find_body_wikilinks(&config.vault_path, &old_id, &old_path)?
+    };
 
     println!(
         "renamed: {} → {}",
@@ -71,9 +77,18 @@ pub fn run(args: &RenameArgs, config: &Config) -> Result<()> {
         rel(&new_path, &config.vault_path)
     );
     if !back_ref_sites.is_empty() {
-        println!("updated {} frontmatter back-reference(s):", back_ref_sites.len());
+        println!(
+            "updated {} frontmatter back-reference(s):",
+            back_ref_sites.len()
+        );
         for site in &back_ref_sites {
             println!("  {} ({})", rel(&site.path, &config.vault_path), site.field);
+        }
+    }
+    if !body_sites.is_empty() {
+        println!("updated {} body wikilink site(s):", body_sites.len());
+        for site in &body_sites {
+            println!("  {}", rel(&site.path, &config.vault_path));
         }
     }
 
@@ -82,10 +97,48 @@ pub fn run(args: &RenameArgs, config: &Config) -> Result<()> {
         return Ok(());
     }
 
-    // Execute the plan
-    apply_rename(&old_path, &new_path, &args.new_title)?;
+    // --- Transactional apply ---
+    // 1. Snapshot every file we're about to touch
+    let mut snapshots: HashMap<PathBuf, String> = HashMap::new();
+    snapshots.insert(old_path.clone(), std::fs::read_to_string(&old_path)?);
     for site in &back_ref_sites {
-        rewrite_frontmatter_back_ref(&site.path, &old_id, &new_id, &config.registry)?;
+        if !snapshots.contains_key(&site.path) {
+            snapshots.insert(site.path.clone(), std::fs::read_to_string(&site.path)?);
+        }
+    }
+    for site in &body_sites {
+        if !snapshots.contains_key(&site.path) {
+            snapshots.insert(site.path.clone(), std::fs::read_to_string(&site.path)?);
+        }
+    }
+
+    // 2. Apply, rolling back on any failure
+    let result: Result<()> = (|| {
+        apply_rename(&old_path, &new_path, &args.new_title)?;
+        for site in &back_ref_sites {
+            rewrite_frontmatter_back_ref(&site.path, &old_id, &new_id, &config.registry)?;
+        }
+        for site in &body_sites {
+            // If the body-site was the entity being renamed, it's now at new_path
+            let effective_path = if site.path == old_path {
+                new_path.clone()
+            } else {
+                site.path.clone()
+            };
+            rewrite_body_wikilinks(&effective_path, &old_id, &new_id)?;
+        }
+        Ok(())
+    })();
+
+    if let Err(e) = result {
+        // Rollback: restore every snapshotted file
+        if new_path.exists() && new_path != old_path {
+            let _ = std::fs::remove_file(&new_path);
+        }
+        for (path, original) in &snapshots {
+            std::fs::write(path, original)?;
+        }
+        return Err(e);
     }
 
     Ok(())
@@ -230,6 +283,60 @@ fn apply_rename(
     if new_path != old_path {
         std::fs::remove_file(old_path)?;
     }
+    Ok(())
+}
+
+pub(crate) struct BodyRefSite {
+    pub path: PathBuf,
+}
+
+fn find_body_wikilinks(
+    vault: &std::path::Path,
+    old_id: &str,
+    _exclude: &std::path::Path,
+) -> Result<Vec<BodyRefSite>> {
+    // Note: we do NOT exclude the renamed entity itself — its own body may
+    // contain self-references that need updating after the rename.
+    let mut sites = Vec::new();
+    let token = format!("[[{old_id}]]");
+    for entry in WalkDir::new(vault).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let content = std::fs::read_to_string(path)?;
+        // Split frontmatter from body
+        let body = match content.trim_start().starts_with("---") {
+            true => match content.find("\n---") {
+                Some(close) => {
+                    let body_start = close + 4;
+                    if body_start < content.len() {
+                        &content[body_start..]
+                    } else {
+                        ""
+                    }
+                }
+                None => &content[..],
+            },
+            false => &content[..],
+        };
+        if body.contains(&token) {
+            sites.push(BodyRefSite {
+                path: path.to_path_buf(),
+            });
+        }
+    }
+    Ok(sites)
+}
+
+fn rewrite_body_wikilinks(path: &std::path::Path, old_id: &str, new_id: &str) -> Result<()> {
+    let content = std::fs::read_to_string(path)?;
+    let (fm, body) = parse_frontmatter(&content)?;
+    let old_tok = format!("[[{old_id}]]");
+    let new_tok = format!("[[{new_id}]]");
+    let new_body = body.replace(&old_tok, &new_tok);
+    let new_content = serialize_entity(&fm, &new_body);
+    std::fs::write(path, new_content)?;
     Ok(())
 }
 
